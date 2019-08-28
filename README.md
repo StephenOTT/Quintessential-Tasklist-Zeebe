@@ -3,7 +3,6 @@ The quintessential Zeebe tasklist for BPMN Human tasks with Drag and Drop Form b
 
 WIP
 
-
 Setup SLF4J logging: `-Dvertx.logger-delegate-factory-class-name=io.vertx.core.logging.SLF4JLogDelegateFactory`
 
 vertx run command: `run com.github.stephenott.MainVerticle -conf src/main/java/com/github/stephenott/conf/application.json`
@@ -24,6 +23,7 @@ vertx run command: `run com.github.stephenott.MainVerticle -conf src/main/java/c
 - Zeebe Workers support clustering of 1-N, the same design as the Zeebe Clients.  Workers are independent of Clients.
 - Clients and Workers can be added at startup and during runtime.
 - Failed nodes in the Vertx Cluster (Clients or Workers) will be re-instantiated through the vertx cluster manager's configuration. 
+- Vertx Applications may choose to only run as a Worker within the cluster, and do work for other clients.
 
 # Notes
 
