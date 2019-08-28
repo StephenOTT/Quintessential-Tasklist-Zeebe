@@ -20,10 +20,10 @@ vertx run command: `run com.github.stephenott.MainVerticle -conf src/main/java/c
 
 ![cluster-arch](./docs/design/Cluster-Arch.png)
 
-Zeebe Worker design to support a Vertx Cluster that have 1-N Zeebe Clients that can connect to 1-N Zeebe Clusters.
-
-Zeebe Workers support clustering of 1-N, the same design as the Zeebe Clients.  Workers are independent of Clients.
-
+- Zeebe Worker design to support a Vertx Cluster that have 1-N Zeebe Clients that can connect to 1-N Zeebe Clusters.
+- Zeebe Workers support clustering of 1-N, the same design as the Zeebe Clients.  Workers are independent of Clients.
+- Clients and Workers can be added at startup and during runtime.
+- Failed nodes in the Vertx Cluster (Clients or Workers) will be re-instantiated through the vertx cluster manager's configuration. 
 
 # Notes
 
