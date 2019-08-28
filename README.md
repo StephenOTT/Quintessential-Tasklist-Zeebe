@@ -16,6 +16,14 @@ vertx run command: `run com.github.stephenott.MainVerticle -conf src/main/java/c
 1. Compartmentlizations of a ActivatedJob for sending over the wire (Event bus)
 1. Human Task API to recreate and improve upon (simplify?) Camunda Human Task design.
 
+# Cluster Architecture
+
+![cluster-arch](./docs/design/Cluster-Arch.png)
+
+Zeebe Worker design to support a Vertx Cluster that have 1-N Zeebe Clients that can connect to 1-N Zeebe Clusters.
+
+Zeebe Workers support clustering of 1-N, the same design as the Zeebe Clients.  Workers are independent of Clients.
+
 
 # Notes
 
