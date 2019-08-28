@@ -1,0 +1,20 @@
+{
+  "zeebe_client": {
+    "default_config": {
+      "broker": {
+        "contactPoint": "0.0.0.0:26500",
+        "requestTimeout": 30000
+      },
+      "worker": {
+        "name": "dog",
+        "timeout": 100000,
+        "maxJobsActive": 1,
+        "pollInterval": 5000,
+        "threads": 1
+      },
+      "message": {
+        "timeToLive": 10000
+      }
+    }
+  }
+}
