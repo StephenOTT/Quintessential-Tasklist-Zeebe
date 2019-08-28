@@ -12,7 +12,7 @@ vertx run command: `run com.github.stephenott.MainVerticle -conf src/main/java/c
 1. Vertx ZeebeClient verticle (leverages the io.zeebe.client lib)
 1. Vetx ZeebeWorker verticle
 1. Client configuration using Vertx standards
-1. Compartmentlizations of a ActivatedJob for sending over the wire (Event bus)
+1. Compartmentalization of a ActivatedJob for sending over the wire (Event bus)
 1. Human Task API to recreate and improve upon (simplify?) Camunda Human Task design.
 
 # Cluster Architecture
