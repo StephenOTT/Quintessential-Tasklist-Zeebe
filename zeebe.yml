@@ -1,0 +1,20 @@
+zeebe:
+  clients:
+    - name: MyCustomClient
+      brokerContactPoint: "0.0.0.0:25600"
+      requestTimeout: 60000
+      workers:
+        - name: MyWorker
+          jobTypes:
+            - type1
+            - myCustomType
+executors:
+  - name: Script-Executor
+    address: type1
+    execute: ./scripts/script1.js
+  - name: CommonGenericExecutor
+    address: commonExecutor
+    execute: classpath:com.custom.executors.Executor1
+  - name: IpBlocker
+    address: block-ip
+    execute: ./cyber/BlockIP.py
