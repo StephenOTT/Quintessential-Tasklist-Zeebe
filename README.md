@@ -21,7 +21,7 @@ Java: `1.8`
 
 # Cluster Architecture
 
-![cluster-arch](./docs/design/cluster-arch.png)
+![cluster-arch](./docs/design/cluster.png)
 
 - Zeebe Worker design to support a Vertx Cluster that have 1-N Zeebe Clients that can connect to 1-N Zeebe Clusters.
 - Zeebe Workers support clustering of 1-N, the same design as the Zeebe Clients.  Workers are independent of Clients.
