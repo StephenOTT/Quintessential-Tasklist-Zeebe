@@ -12,6 +12,7 @@ executors:
   - name: Script-Executor
     address: type1
     execute: ./scripts/script1.js
+    instances: 2
   - name: CommonGenericExecutor
     address: commonExecutor
     execute: classpath:com.custom.executors.Executor1

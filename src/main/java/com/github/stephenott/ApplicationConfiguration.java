@@ -122,6 +122,7 @@ public class ApplicationConfiguration {
         private String name;
         private String address;
         private String execute;
+        private int instances = 1;
 
         public ExecutorConfiguration() {
         }
@@ -148,6 +149,14 @@ public class ApplicationConfiguration {
 
         public void setExecute(String execute) {
             this.execute = execute;
+        }
+
+        public int getInstances() {
+            return instances;
+        }
+
+        public void setInstances(int instances) {
+            this.instances = instances;
         }
     }
 

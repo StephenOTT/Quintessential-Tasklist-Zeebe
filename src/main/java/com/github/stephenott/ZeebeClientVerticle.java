@@ -5,7 +5,6 @@ import io.vertx.circuitbreaker.CircuitBreakerOptions;
 import io.vertx.core.*;
 import io.vertx.core.eventbus.DeliveryOptions;
 import io.vertx.core.eventbus.EventBus;
-import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.zeebe.client.ZeebeClient;
 import io.zeebe.client.api.ZeebeFuture;
@@ -19,7 +18,6 @@ import io.zeebe.client.api.response.WorkflowInstanceEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 
@@ -62,13 +60,13 @@ public class ZeebeClientVerticle extends AbstractVerticle {
 
         startPromise.complete();
 
-//        Thread.sleep(1500);
+        Thread.sleep(1500);
 
-//        deployWorkflow();
+        deployWorkflow();
 
-//        Thread.sleep(1500);
+        Thread.sleep(1500);
 
-//        startWorkflowInstance();
+        startWorkflowInstance();
 
 
         // Consumers are equal to "Zeebe Workers"
@@ -91,7 +89,7 @@ public class ZeebeClientVerticle extends AbstractVerticle {
 
         return ZeebeClient.newClientBuilder()
                 .brokerContactPoint(configuration.getBrokerContactPoint())
-                .defaultRequestTimeout(Duration.ofMinutes(5L))
+                .defaultRequestTimeout(Duration.ofMinutes(1L))
                 .defaultMessageTimeToLive(Duration.ofHours(1))
                 .usePlaintext() //@TODO remove and replace with cert  /-/SECURITY/-/
                 .build();
@@ -113,16 +111,16 @@ public class ZeebeClientVerticle extends AbstractVerticle {
 
     private void createJobConsumer(String jobType, String workerName) {
 
-        pollingBreaker.execute(brkCmd -> {
+//        pollingBreaker.execute(brkCmd -> {
 
             pollForJobs(jobType, workerName, pollResult -> {
 
                 if (pollResult.succeeded()) {
-                    brkCmd.complete();
+//                    brkCmd.complete();
 
                     // If no results from poll:
                     if (pollResult.result().isEmpty()) {
-                        brkCmd.complete();
+//                        brkCmd.complete();
                         log.info(workerName + " found NO Jobs for " + jobType + ", looping...");
                         createJobConsumerWithEb(jobType, workerName);
 
@@ -166,11 +164,11 @@ public class ZeebeClientVerticle extends AbstractVerticle {
                         });
                     }
                 } else {
-                    brkCmd.fail(pollResult.cause());
+//                    brkCmd.fail(pollResult.cause());
                 }
             }); // End of Poll
 
-        }); // End of Breaker
+//        }); // End of Breaker
     }
 
     private void pollForJobs(String jobType, String workerName, Handler<AsyncResult<List<ActivatedJob>>> handler) {
@@ -185,7 +183,7 @@ public class ZeebeClientVerticle extends AbstractVerticle {
                                 .jobType(jobType)
                                 .maxJobsToActivate(1)
                                 .workerName(workerName)
-                                .requestTimeout(Duration.ofSeconds(30L));
+                                .requestTimeout(Duration.ofMinutes(1L));
 
                         ZeebeFuture<ActivateJobsResponse> jobsResponse = finalCommandStep.send();
 
@@ -194,6 +192,7 @@ public class ZeebeClientVerticle extends AbstractVerticle {
                     } catch (Exception e) {
                         blockProm.fail(e);
                     }
+
                 }, result -> {
                     if (result.succeeded()) {
                         handler.handle(Future.succeededFuture(result.result()));
@@ -212,18 +211,20 @@ public class ZeebeClientVerticle extends AbstractVerticle {
         log.info("Handling Job");
 
         DeliveryOptions options = new DeliveryOptions().setSendTimeout(1200);
-        JsonObject object;
-        try {
-            object = JsonObject.mapFrom(Json.mapper.readTree(job.toJson()));
-        } catch (IOException e) {
-            throw new IllegalStateException();
-        }
 
-        eb.<JsonObject>request(Common.JOB_ADDRESS_PREFIX + job.getType(), object, options, reply -> {
+        String address = Common.JOB_ADDRESS_PREFIX + job.getType();
+        JsonObject message = new ActivatedJobDto(job).toJsonObject();
+
+        eb.<JsonObject>request(address, message, options, reply -> {
             if (reply.succeeded()) {
                 log.info("Job work was done");
-                DoneJob doneJob = DoneJob.fromJsonObject(reply.result().body());
-                promise.complete(doneJob);
+                try {
+                    DoneJob doneJob = DoneJob.fromJsonObject(reply.result().body());
+                    promise.complete(doneJob);
+                } catch (Exception e){
+                    log.error("JSON response from event bus could not be parsed into a DoneJob", e);
+                    promise.fail(e);
+                }
             } else {
                 promise.fail(reply.cause());
             }

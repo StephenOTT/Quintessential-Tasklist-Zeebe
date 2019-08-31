@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_10u1xwr" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Zeebe Modeler" exporterVersion="0.6.2">
-  <bpmn:process id="process1" name="Process 1" isExecutable="true">
+  <bpmn:process id="Process_1" name="Process 1" isExecutable="true">
     <bpmn:startEvent id="StartEvent_1">
       <bpmn:outgoing>SequenceFlow_0l2v1zn</bpmn:outgoing>
     </bpmn:startEvent>
     <bpmn:serviceTask id="ServiceTask_1msa2wa" name="Job1">
       <bpmn:extensionElements>
-        <zeebe:taskDefinition type="job1" retries="2" />
+        <zeebe:taskDefinition type="type1" retries="2" />
         <zeebe:taskHeaders>
           <zeebe:header key="script" value="scrip1.js" />
         </zeebe:taskHeaders>

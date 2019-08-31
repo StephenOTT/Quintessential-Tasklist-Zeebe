@@ -47,11 +47,15 @@ public class MainVerticle extends AbstractVerticle {
 
     private void deployZeebeWorker(ApplicationConfiguration.ExecutorConfiguration config){
         DeploymentOptions options = new DeploymentOptions();
+        options.setInstances(config.getInstances());
+        options.setWorker(true);
+        //@TODO Review if should be given their own worker pool
+
         options.setConfig(JsonObject.mapFrom(config));
 
         vertx.deployVerticle(ExecutorVerticle::new, options, vert -> {
             if (vert.succeeded()){
-                log.info("ZeebeWorker Verticle " + config.getName() + " has successfully deployed");
+                log.info("ZeebeWorker Verticle " + config.getName() + " has successfully deployed (" + config.getInstances() + " instances)");
             } else {
                 log.error("ZeebeWorker Verticle " + config.getName() + " has failed to deploy!", vert.cause());
             }

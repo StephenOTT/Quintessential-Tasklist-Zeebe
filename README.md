@@ -46,7 +46,8 @@ Extensive configuration capabilities are provided to control the exact setup of 
 - A Executor's `execute` value is the destination of the script or class that will be executed in order to consume the Job.
 - A executor will return a `DoneJob` object that contains the result (COMPLETE, FAIL) of the execution, retries, and any variables to be sent back into Zeebe on reporting the Job complete or fail.
 - Clients can be established without the need to establish executors, as there may be executors on other applications in the Cluster.
-- Executors can be established without the need to establish ZebeeClients. 
+- Executors can be established without the need to establish ZebeeClients.
+- Executor `instances` controls how many worker verticle instances are activated for each executor.  This controls thread and High Availability usage. 
 
 The Yaml location can be configured through the applications config.json.  Default is `./zeebe.yml`. 
 
@@ -67,6 +68,7 @@ executors:
   - name: Script-Executor
     address: type1
     execute: ./scripts/script1.js
+    instances: 2
   - name: CommonGenericExecutor
     address: commonExecutor
     execute: classpath:com.custom.executors.Executor1
