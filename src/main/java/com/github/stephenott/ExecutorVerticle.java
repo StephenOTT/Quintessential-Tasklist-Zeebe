@@ -1,5 +1,6 @@
 package com.github.stephenott;
 
+import com.github.stephenott.configuration.ApplicationConfiguration;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.json.JsonObject;
@@ -8,7 +9,8 @@ import org.slf4j.LoggerFactory;
 
 public class ExecutorVerticle extends AbstractVerticle {
 
-    private Logger log;
+    private Logger log = LoggerFactory.getLogger(ExecutorVerticle.class);
+
     private EventBus eb;
     private ApplicationConfiguration.ExecutorConfiguration executorConfiguration;
 
@@ -16,12 +18,15 @@ public class ExecutorVerticle extends AbstractVerticle {
     public void start() throws Exception {
         executorConfiguration = config().mapTo(ApplicationConfiguration.ExecutorConfiguration.class);
 
-        log = LoggerFactory.getLogger("WorkerVerticle." + executorConfiguration.getName());
-
         eb = vertx.eventBus();
 
-        eb.<JsonObject>consumer(Common.JOB_ADDRESS_PREFIX + executorConfiguration.getAddress(), handler -> {
+        String address = Common.JOB_ADDRESS_PREFIX + executorConfiguration.getAddress();
+
+        eb.<JsonObject>consumer(address, handler -> {
             log.info("doing some work!!!");
+
+            String sourceClient = handler.headers().get("sourceClient");
+
             JsonObject job = handler.body();
 
             //@TODO Add polyexecutor
@@ -31,7 +36,7 @@ public class ExecutorVerticle extends AbstractVerticle {
                     DoneJob.Result.COMPLETE,
                     (job.getInteger("retries") > 0) ? job.getInteger("retries") - 1 : 0);
 
-            handler.reply(JsonObject.mapFrom(doneJob));
+            eb.send(sourceClient + ".job-action.completion", doneJob.toJsonObject());
 
         });
     }

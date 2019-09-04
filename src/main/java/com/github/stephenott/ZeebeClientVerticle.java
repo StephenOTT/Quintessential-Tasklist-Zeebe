@@ -1,10 +1,12 @@
 package com.github.stephenott;
 
+import com.github.stephenott.configuration.ApplicationConfiguration;
 import io.vertx.circuitbreaker.CircuitBreaker;
 import io.vertx.circuitbreaker.CircuitBreakerOptions;
 import io.vertx.core.*;
 import io.vertx.core.eventbus.DeliveryOptions;
 import io.vertx.core.eventbus.EventBus;
+import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.zeebe.client.ZeebeClient;
 import io.zeebe.client.api.ZeebeFuture;
@@ -13,8 +15,6 @@ import io.zeebe.client.api.command.ClientStatusException;
 import io.zeebe.client.api.command.FinalCommandStep;
 import io.zeebe.client.api.response.ActivateJobsResponse;
 import io.zeebe.client.api.response.ActivatedJob;
-import io.zeebe.client.api.response.DeploymentEvent;
-import io.zeebe.client.api.response.WorkflowInstanceEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,7 +34,7 @@ public class ZeebeClientVerticle extends AbstractVerticle {
     private CircuitBreaker pollingBreaker;
 
     @Override
-    public void start(Promise<Void> startPromise) throws Exception {
+    public void start() throws Exception {
         clientConfiguration = config().mapTo(ApplicationConfiguration.ZeebeClientConfiguration.class);
 
         log = LoggerFactory.getLogger("ClientVerticle." + clientConfiguration.getName());
@@ -52,22 +52,13 @@ public class ZeebeClientVerticle extends AbstractVerticle {
 
         zClient = createZeebeClient(clientConfiguration);
 
+        createJobCompletionConsumer();
+
         eb.<JsonObject>localConsumer("createJobConsumer", act -> {
             String jobType = act.body().getString("jobType");
             String consumerName = act.body().getString("consumerName");
             createJobConsumer(jobType, consumerName);
         });
-
-        startPromise.complete();
-
-        Thread.sleep(1500);
-
-        deployWorkflow();
-
-        Thread.sleep(1500);
-
-        startWorkflowInstance();
-
 
         // Consumers are equal to "Zeebe Workers"
         clientConfiguration.getWorkers().forEach(consumer -> {
@@ -122,6 +113,7 @@ public class ZeebeClientVerticle extends AbstractVerticle {
                     if (pollResult.result().isEmpty()) {
 //                        brkCmd.complete();
                         log.info(workerName + " found NO Jobs for " + jobType + ", looping...");
+
                         createJobConsumerWithEb(jobType, workerName);
 
                         //If found jobs in the results of the poll:
@@ -129,39 +121,11 @@ public class ZeebeClientVerticle extends AbstractVerticle {
                         log.info(workerName + " found some Jobs for " + jobType + ", count: " + pollResult.result().size());
 
                         //For Each Job that was returned
-                        pollResult.result().forEach(job -> {
+                        pollResult.result().forEach(this::handleJob);
 
-                            handleJob(job).setHandler(result -> {
-                                if (result.succeeded()) {
-                                    //If the work was executed and returned a DoneJob
-                                    DoneJob doneJob = result.result();
-                                    if (doneJob.getResult().equals(DoneJob.Result.COMPLETE)) {
+                        log.info("Done handling jobs....");
 
-                                        //@TODO Move to method
-                                        reportJobComplete(doneJob).setHandler(ar -> {
-                                            if (ar.succeeded()) {
-                                                log.info("Looping: " + jobType + "  " + workerName);
-                                                createJobConsumerWithEb(jobType, workerName);
-                                            } else {
-                                                log.error("Unable to report job completion: " + job.toJson(), ar.cause());
-                                            }
-                                        });
-
-                                    } else {
-                                        //@TODO move to method
-                                        reportJobFail(doneJob).setHandler(ar -> {
-                                            if (ar.succeeded()) {
-                                                log.info("Looping: " + jobType + "  " + workerName);
-                                                createJobConsumerWithEb(jobType, workerName);
-                                            } else {
-                                                log.error("Unable to report job failure: " + job.toJson(), ar.cause());
-
-                                            }
-                                        });
-                                    }
-                                }
-                            });
-                        });
+                        createJobConsumerWithEb(jobType, workerName); //Basically a non-blocking loop
                     }
                 } else {
 //                    brkCmd.fail(pollResult.cause());
@@ -169,6 +133,18 @@ public class ZeebeClientVerticle extends AbstractVerticle {
             }); // End of Poll
 
 //        }); // End of Breaker
+    }
+
+    private void createJobCompletionConsumer(){
+        eb.<JsonObject>consumer(clientConfiguration.getName() + ".job.completion").handler(msg->{
+            DoneJob doneJob = msg.body().mapTo(DoneJob.class);
+
+            if (doneJob.getResult().equals(DoneJob.Result.COMPLETE)){
+                reportJobComplete(doneJob);
+            } else {
+                reportJobFail(doneJob);
+            }
+        });
     }
 
     private void pollForJobs(String jobType, String workerName, Handler<AsyncResult<List<ActivatedJob>>> handler) {
@@ -192,8 +168,7 @@ public class ZeebeClientVerticle extends AbstractVerticle {
                     } catch (Exception e) {
                         blockProm.fail(e);
                     }
-
-                }, result -> {
+                }, false, result -> {
                     if (result.succeeded()) {
                         handler.handle(Future.succeededFuture(result.result()));
                     } else {
@@ -204,39 +179,25 @@ public class ZeebeClientVerticle extends AbstractVerticle {
         );
     }
 
+    private void handleJob(ActivatedJob job) {
+        log.info("Handling Job... {}", job.getKey());
 
-    private Future<DoneJob> handleJob(ActivatedJob job) {
-        Promise<DoneJob> promise = Promise.promise();
+        DeliveryOptions options = new DeliveryOptions().setSendTimeout(1200)
+                .addHeader("sourceClient", clientConfiguration.getName());
+        JsonObject object = (JsonObject) Json.decodeValue(job.toJson());
 
-        log.info("Handling Job");
-
-        DeliveryOptions options = new DeliveryOptions().setSendTimeout(1200);
+        log.info("OBJECT:--> {}", object.toString());
 
         String address = Common.JOB_ADDRESS_PREFIX + job.getType();
-        JsonObject message = new ActivatedJobDto(job).toJsonObject();
+        log.info("Sending Job work to address: {}", address);
 
-        eb.<JsonObject>request(address, message, options, reply -> {
-            if (reply.succeeded()) {
-                log.info("Job work was done");
-                try {
-                    DoneJob doneJob = DoneJob.fromJsonObject(reply.result().body());
-                    promise.complete(doneJob);
-                } catch (Exception e){
-                    log.error("JSON response from event bus could not be parsed into a DoneJob", e);
-                    promise.fail(e);
-                }
-            } else {
-                promise.fail(reply.cause());
-            }
-        });
-        return promise.future();
+        eb.send(address, object, options);
     }
-
 
     private Future<Void> reportJobComplete(DoneJob doneJob) {
         Promise<Void> promise = Promise.promise();
 
-        log.info("Reporting job is complete...");
+        log.info("Reporting job is complete... {}", doneJob.getJobKey());
 
         vertx.executeBlocking(blkProm -> {
             //@TODO Add support for variables and custom timeout configs
@@ -312,30 +273,5 @@ public class ZeebeClientVerticle extends AbstractVerticle {
 
         return promise.future();
     }
-
-
-    private void deployWorkflow() {
-        log.info("Deploying BPMN... ");
-
-        DeploymentEvent deploymentEvent = zClient.newDeployCommand()
-                .addResourceFile("./bpmn/bpmn1.bpmn")
-                .send().join();
-
-        log.info("Deployed BPMN: " + deploymentEvent.getKey());
-    }
-
-    private void startWorkflowInstance() {
-        ZeebeFuture<WorkflowInstanceEvent> workflowInstanceEventFuture = zClient.newCreateInstanceCommand()
-                .bpmnProcessId("Process_1")
-                .latestVersion()
-                .send();
-
-        log.info("Starting workflow instance");
-
-        WorkflowInstanceEvent workflowInstanceEvent = workflowInstanceEventFuture.join();
-
-        log.info("Starting Workflow instance: " + workflowInstanceEvent.getWorkflowInstanceKey());
-    }
-
 
 }

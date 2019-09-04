@@ -3,6 +3,8 @@ package com.github.stephenott;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
+import com.github.stephenott.configuration.ApplicationConfiguration;
+import com.github.stephenott.usertask.UserTaskExecutorVerticle;
 import io.vertx.config.ConfigRetriever;
 import io.vertx.config.ConfigRetrieverOptions;
 import io.vertx.config.ConfigStoreOptions;
@@ -34,9 +36,16 @@ public class MainVerticle extends AbstractVerticle {
             if (ac.succeeded()) {
                 appConfig = ac.result();
 
-                appConfig.getExecutors().forEach(this::deployZeebeWorker);
+                appConfig.getExecutors().forEach(this::deployExecutorVerticle);
+
+                appConfig.getUserTaskExecutors().forEach(this::deployUserTaskExecutorVerticle);
 
                 appConfig.getZeebe().getClients().forEach(this::deployZeebeClient);
+
+
+                if (appConfig.getManagementServer().isEnabled()){
+                    deployManagementClient(appConfig.getManagementServer());
+                }
 
             } else {
                 throw new IllegalStateException("Unable to read yml configuration", ac.cause());
@@ -44,13 +53,23 @@ public class MainVerticle extends AbstractVerticle {
         });
     }
 
+    private void deployManagementClient(ApplicationConfiguration.ManagementHttpConfiguration config){
+        DeploymentOptions options = new DeploymentOptions();
+        options.setConfig(JsonObject.mapFrom(config));
 
-    private void deployZeebeWorker(ApplicationConfiguration.ExecutorConfiguration config){
+        vertx.deployVerticle(ManagementHttpVerticle::new, options, deployResult ->{
+            if (deployResult.succeeded()){
+                log.info("Management Client has successfully deployed");
+            } else {
+                log.error("Management Client failed to deploy", deployResult.cause());
+            }
+        });
+    }
+
+
+    private void deployExecutorVerticle(ApplicationConfiguration.ExecutorConfiguration config){
         DeploymentOptions options = new DeploymentOptions();
         options.setInstances(config.getInstances());
-        options.setWorker(true);
-        //@TODO Review if should be given their own worker pool
-
         options.setConfig(JsonObject.mapFrom(config));
 
         vertx.deployVerticle(ExecutorVerticle::new, options, vert -> {
@@ -58,6 +77,19 @@ public class MainVerticle extends AbstractVerticle {
                 log.info("ZeebeWorker Verticle " + config.getName() + " has successfully deployed (" + config.getInstances() + " instances)");
             } else {
                 log.error("ZeebeWorker Verticle " + config.getName() + " has failed to deploy!", vert.cause());
+            }
+        });
+    }
+
+    private void deployUserTaskExecutorVerticle(ApplicationConfiguration.UserTaskExecutorConfiguration config){
+        DeploymentOptions options = new DeploymentOptions();
+        options.setConfig(JsonObject.mapFrom(config));
+
+        vertx.deployVerticle(UserTaskExecutorVerticle::new, options, vert -> {
+            if (vert.succeeded()){
+                log.info("UserTaskExecutor Verticle " + config.getName() + " has successfully deployed");
+            } else {
+                log.error("UserTaskExecutor Verticle " + config.getName() + " has failed to deploy!", vert.cause());
             }
         });
     }

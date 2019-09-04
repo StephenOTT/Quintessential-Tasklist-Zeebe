@@ -1,21 +1,35 @@
 zeebe:
   clients:
     - name: MyCustomClient
-      brokerContactPoint: "0.0.0.0:25600"
-      requestTimeout: 60000
+      brokerContactPoint: "localhost:25600"
+      requestTimeout: PT10S
       workers:
         - name: MyWorker
           jobTypes:
             - type1
-            - myCustomType
+            - ut.generic
 executors:
   - name: Script-Executor
-    address: type1
+    address: "type1"
     execute: ./scripts/script1.js
-    instances: 2
   - name: CommonGenericExecutor
     address: commonExecutor
     execute: classpath:com.custom.executors.Executor1
   - name: IpBlocker
     address: block-ip
     execute: ./cyber/BlockIP.py
+
+userTaskExecutors:
+  - name: GenericUserTask
+    address: ut.generic
+
+managementServer:
+  enabled: true
+  apiRoot: server1
+  corsRegex: ".*."
+  port: 8080
+  instances: 1
+  zeebeClient:
+    name: DeploymentClient
+    brokerContactPoint: "localhost:25600"
+    requestTimeout: PT10S
