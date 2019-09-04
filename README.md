@@ -248,9 +248,65 @@ You can deploy many management servers as needed.  Each server can be deployed f
 
 You can deploy the same server with multiple `instances` to provide more throughput. 
 
+## Create Workflow Instance / Start Workflow
+
+`POST localhost:8080/server1/create-instance`
+
+Headers:
+- `Content-Type: application/json`
+- `Accept: application/json`
+
+Json Body:
+
+```json
+{
+  "workflowKey": 1234567890
+}
+```
+
+Where `workflowKey` is the unique workflow key that was generated for the BPMN process/pool during deployment.
+
+You may also use:
+
+```json
+{
+  "bpmnProcessId": "myProcess",
+  "bpmnProcessVersion": 2
+}
+```
+
+Where `bpmnProcessId` is the BPMN's process Id property (sometimes referred to as a process key).
+The `bpmnProcessVersion` is optional.  You can set the version number or set as `-1` which means "latest version" / newest.  If you do not provide the property it will default to latest version.
+
+`varaibles` can also be provided as a json object:
+
+```json
+{
+  "workflowKey": 1234567890,
+  "variables": {
+    "myVar1": 123,
+    "myVar2": "some value",
+    "myVarABC": [1,2,5,10],
+    "myVarXYZ": {
+        "1": "A",
+        "2": "B"
+    }
+  }
+}
+```
+
+The variables will be injected into the created workflow instace.
 
 
-# Notes
+# DoneJob
+ 
+ Add docs here
+...
+
+
+----
+
+# Raw Notes
 
 1. Implements clustering and scaling through Vertx instances.
 1. ZeebeClientVerticle can increase in number of instances: 1 instance == 1 ZeebeClient Channel connection.
