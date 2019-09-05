@@ -4,6 +4,9 @@ import com.github.stephenott.common.Common;
 import com.github.stephenott.conf.ApplicationConfiguration;
 import com.github.stephenott.executors.JobResult;
 import io.vertx.core.AbstractVerticle;
+import io.vertx.core.AsyncResult;
+import io.vertx.core.Future;
+import io.vertx.core.Handler;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
@@ -66,27 +69,32 @@ public class UserTaskExecutorVerticle extends AbstractVerticle {
 
             log.info("User Task created: {}", JsonObject.mapFrom(utEntity).toString());
 
-            saveEntitytoDb(utEntity);
+            saveToDb(utEntity, res ->{
+                if (res.succeeded()){
+                    JobResult jobResult = new JobResult(
+                            utEntity.getZeebeJobKey(),
+                            JobResult.Result.COMPLETE, 0);
+                    
+                    eb.send(sourceClient + ".job-action.completion", jobResult.toJsonObject());
 
-            JobResult jobResult = new JobResult(
-                    utEntity.getZeebeJobKey(),
-                    JobResult.Result.COMPLETE, 0);
-
-            eb.send(sourceClient + ".job-action.completion", jobResult.toJsonObject());
+                } else {
+                   throw new IllegalStateException("Unable to save to DB", res.cause());
+                }
+            });
 
         });
 
         log.info("User Task Executor Verticle consuming tasks at: {}", utExecutorConfig.getAddress());
     }
 
-    public void saveEntitytoDb(UserTaskEntity entity){
+    public void saveToDb(UserTaskEntity entity, Handler<AsyncResult<String>> handler){
         mClient.save("tasks", entity.toMongoJson(), res -> {
             if (res.succeeded()) {
-                String id = res.result();
-                log.info("Saved entity with id " + id);
+                handler.handle(Future.succeededFuture(res.result()));
 
             } else {
-                log.error("could not save entity",res.cause());
+                log.error("Could not save mongo entity",res.cause());
+                handler.handle(Future.failedFuture(res.cause()));
             }
         });
     }
