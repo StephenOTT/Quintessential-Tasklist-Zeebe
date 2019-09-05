@@ -132,12 +132,12 @@ You can deploy a Executor with multiple `instances` to provide more more paralle
 
 Required properties: `name`, `address`, `execute`
 
-Completion of Jobs sent to Executors is captured over the event bus with the DoneJob object.
-Completed (successfully or a failure such as a business error) are sent as a DoneJob to event bus address: `sourceClient.job-aciton.completion`.
+Completion of Jobs sent to Executors is captured over the event bus with the JobResult object.
+Completed (successfully or a failure such as a business error) are sent as a JobResult to event bus address: `sourceClient.job-aciton.completion`.
 Where `sourceClient` is the ZeebeClient `name` that is used in the `zeebe.clients[].name` property.
 The `sourceClient` ensures that a completed job can be sent back to the same Zeebe Cluster, but not necessarily using the same instance of a ZeebeClient that consumed the job.
 
-DoneJob's that have a `result=FAIL` will have their corresponding Zeebe Job actioned as a Failed Job.
+JobResult's that have a `result=FAIL` will have their corresponding Zeebe Job actioned as a Failed Job.
 
 
 # User Task Executors
@@ -166,12 +166,12 @@ You can deploy a UT Executor with multiple `instances` to provide more more para
 UT Executors primary function is to provide capture of UTs from Zeebe and convert the Zeebe jobs into a UserTaskEntity.
 A UserTaskEntity is then saved in the storage of choice (such as a DB).
 
-Completion of User Tasks is captured over the event bus with the DoneJob object.
-Completed (successfully or a failure such as a business error) are sent as a DoneJob to event bus address: `sourceClient.job-aciton.completion`.
+Completion of User Tasks is captured over the event bus with the JobResult object.
+Completed (successfully or a failure such as a business error) are sent as a JobResult to event bus address: `sourceClient.job-aciton.completion`.
 Where `sourceClient` is the ZeebeClient `name` that is used in the `zeebe.clients[].name` property.
 The `sourceClient` ensures that a completed job can be sent back to the same Zeebe Cluster, but not necessarily using the same instance of a ZeebeClient that consumed the job.
 
-DoneJob's that have a `result=FAIL` will have their corresponding Zeebe Job actioned as a Failed Job.
+JobResult's that have a `result=FAIL` will have their corresponding Zeebe Job actioned as a Failed Job.
 
 ## User Tasks
 
@@ -206,6 +206,134 @@ In addition to the custom header values above, the following is stored in the Us
 |bpmnProcessId|`string`|The BPMN Process Definition ID|
 |zeebeVariables|`Map of String:Object`|The variables from the Zeebe Job|
 |metadata|`Map of String:Object`|A generic data holder for additional User Task metadata|
+
+# Form Validation Server
+
+The Form Validation Server provides HTTP endpoints for validation a Form Submission based on a provided Form Schema.
+
+Configuration:
+
+```yaml
+formValidatorServer:
+  enabled: true
+  corsRegex: ".*."
+  port: 8082
+  instances: 1
+  address: "form-validation"
+  formValidatorService:
+    host: localhost
+    port: 8083
+    validateUri: /validate
+    requestTimeout: 5000
+```
+
+Where `formValidatorService` is the Form Validator service that performs the actual form validation.
+
+Where `address` is the event bus address that the Form Validator Service can be accessed from rather than through the HTTP endpoint.  Typically the event bus would be used for internal form validation calls such as for the User Task completion / Form Submission HTTP endpoint.
+
+Example Validation Request:
+
+```json
+{
+    "schema":{
+            "display": "form",
+            "components": [
+                {
+                    "label": "Text Field",
+                    "allowMultipleMasks": false,
+                    "showWordCount": false,
+                    "showCharCount": false,
+                    "tableView": true,
+                    "alwaysEnabled": false,
+                    "type": "textfield",
+                    "input": true,
+                    "key": "textField2",
+                    "defaultValue": "",
+                    "validate": {
+                        "customMessage": "",
+                        "json": "",
+                        "required": true
+                    },
+                    "conditional": {
+                        "show": "",
+                        "when": "",
+                        "json": ""
+                    },
+                    "inputFormat": "plain",
+                    "encrypted": false,
+                    "properties": {},
+                    "customConditional": "",
+                    "logic": [],
+                    "attributes": {},
+                    "widget": {
+                        "type": ""
+                    },
+                    "reorder": false
+                },
+                {
+                    "type": "button",
+                    "label": "Submit",
+                    "key": "submit",
+                    "disableOnInvalid": true,
+                    "theme": "primary",
+                    "input": true,
+                    "tableView": true
+                }
+            ],
+            "settings": {
+            }
+        },
+    "submission":{
+    "data": {
+        "textField2": 123,
+        "dog": "cat"
+    },
+    "metadata": {}
+}
+}
+```
+
+Response if validation passes:
+
+```json
+{
+    "processed_submission": {
+        "textField2": "sog"
+    }
+}
+```
+
+Notice that the extra `dog` property is removed because it is not a valid field in the form schema.
+
+Response if validation fails:
+
+```json
+{
+    "isJoi": true,
+    "name": "ValidationError",
+    "details": [
+        {
+            "message": "\"textField2\" must be a string",
+            "path": "textField2",
+            "type": "string.base",
+            "context": {
+                "value": 123,
+                "key": "textField2",
+                "label": "textField2"
+            }
+        }
+    ],
+    "_object": {
+        "textField2": 123,
+        "dog": "cat"
+    },
+    "_validated": {
+        "textField2": 123
+    }
+}
+```
+
+The validation service is also available over the event bus at the `address` property defined in the Form Validation Server configuration.
 
 
 # Management Server
@@ -298,7 +426,7 @@ The `bpmnProcessVersion` is optional.  You can set the version number or set as 
 The variables will be injected into the created workflow instace.
 
 
-# DoneJob
+# JobResult
  
  Add docs here
 ...
@@ -311,7 +439,7 @@ The variables will be injected into the created workflow instace.
 1. Implements clustering and scaling through Vertx instances.
 1. ZeebeClientVerticle can increase in number of instances: 1 instance == 1 ZeebeClient Channel connection.
 1. ExecutorVerticle is independent of ZeebeClient.  You can scale executors across the cluster to any number of instances and have full cluster feature set.
-1. a DoneJob is what holds the context of if a Zeebe Failure should occur in the context of the actual Work that a executor preformed.
+1. a JobResult is what holds the context of if a Zeebe Failure should occur in the context of the actual Work that a executor preformed.
 1. Management HTTP takes a apiRoot namespace which is the prefix for the api calls to deploy and start process instances
 1. TODO: Add a send message HTTP verticle
 1. UserTaskEntity is the DB entity
