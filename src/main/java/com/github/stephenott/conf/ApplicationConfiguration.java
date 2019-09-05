@@ -316,6 +316,7 @@ public class ApplicationConfiguration {
         private int instances = 1;
         private int port = 8082;
         private String corsRegex;
+        private String address = "form-validation";
         private FormValidatorServiceConfiguration formValidatorService;
 
         public FormValidationServerConfiguration() {
@@ -354,6 +355,15 @@ public class ApplicationConfiguration {
 
         public FormValidationServerConfiguration setCorsRegex(String corsRegex) {
             this.corsRegex = corsRegex;
+            return this;
+        }
+
+        public String getAddress() {
+            return address;
+        }
+
+        public FormValidationServerConfiguration setAddress(String address) {
+            this.address = address;
             return this;
         }
 
