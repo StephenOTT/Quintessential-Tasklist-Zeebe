@@ -1,5 +1,8 @@
 package com.github.stephenott.executors.usertask;
 
+import io.vertx.core.json.JsonObject;
+import io.vertx.ext.mongo.impl.codec.json.JsonObjectCodec;
+
 import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
@@ -158,5 +161,10 @@ public class UserTaskEntity {
     public UserTaskEntity setZeebeVariables(Map<String, Object> zeebeVariables) {
         this.zeebeVariables = zeebeVariables;
         return this;
+    }
+
+    public JsonObject toMongoJson() {
+        return JsonObject.mapFrom(this)
+                .put("zeebeDeadline", new JsonObject().put(JsonObjectCodec.DATE_FIELD, this.getZeebeDeadline()));
     }
 }

@@ -7,6 +7,7 @@ import io.vertx.core.AbstractVerticle;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
+import io.vertx.ext.mongo.MongoClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,9 +24,14 @@ public class UserTaskExecutorVerticle extends AbstractVerticle {
 
     private ApplicationConfiguration.UserTaskExecutorConfiguration utExecutorConfig;
 
+    MongoClient mClient;
+
     @Override
     public void start() throws Exception {
         utExecutorConfig = config().mapTo(ApplicationConfiguration.UserTaskExecutorConfiguration.class);
+
+        JsonObject mongoConfig = new JsonObject();
+        mClient = MongoClient.createShared(vertx, mongoConfig);
 
         eb = vertx.eventBus();
 
@@ -60,6 +66,8 @@ public class UserTaskExecutorVerticle extends AbstractVerticle {
 
             log.info("User Task created: {}", JsonObject.mapFrom(utEntity).toString());
 
+            saveEntitytoDb(utEntity);
+
             JobResult jobResult = new JobResult(
                     utEntity.getZeebeJobKey(),
                     JobResult.Result.COMPLETE, 0);
@@ -72,6 +80,14 @@ public class UserTaskExecutorVerticle extends AbstractVerticle {
     }
 
     public void saveEntitytoDb(UserTaskEntity entity){
+        mClient.save("tasks", entity.toMongoJson(), res -> {
+            if (res.succeeded()) {
+                String id = res.result();
+                log.info("Saved entity with id " + id);
 
+            } else {
+                log.error("could not save entity",res.cause());
+            }
+        });
     }
 }

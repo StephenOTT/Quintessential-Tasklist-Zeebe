@@ -136,7 +136,7 @@ public class ZeebeClientVerticle extends AbstractVerticle {
     }
 
     private void createJobCompletionConsumer(){
-        eb.<JsonObject>consumer(clientConfiguration.getName() + ".job.completion").handler(msg->{
+        eb.<JsonObject>consumer(clientConfiguration.getName() + ".job-action.completion").handler(msg->{
             JobResult jobResult = msg.body().mapTo(JobResult.class);
 
             if (jobResult.getResult().equals(JobResult.Result.COMPLETE)){
