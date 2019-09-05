@@ -1,4 +1,4 @@
-package com.github.stephenott;
+package com.github.stephenott.zeebe.client;
 
 import java.util.HashMap;
 import java.util.Map;

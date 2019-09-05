@@ -33,3 +33,14 @@ managementServer:
     name: DeploymentClient
     brokerContactPoint: "localhost:25600"
     requestTimeout: PT10S
+
+formValidatorServer:
+  enabled: true
+  corsRegex: ".*."
+  port: 8082
+  instances: 1
+  formValidatorService:
+    host: localhost
+    port: 8083
+    validateUri: /validate
+    requestTimeout: 5000

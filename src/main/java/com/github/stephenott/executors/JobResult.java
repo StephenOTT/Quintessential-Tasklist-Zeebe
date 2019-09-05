@@ -1,17 +1,12 @@
-package com.github.stephenott;
+package com.github.stephenott.executors;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import io.vertx.core.buffer.Buffer;
-import io.vertx.core.eventbus.Message;
-import io.vertx.core.eventbus.MessageCodec;
-import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-public class DoneJob {
+public class JobResult {
 
     private Result result;
     private long jobKey;
@@ -24,10 +19,10 @@ public class DoneJob {
         FAIL
     }
 
-    private DoneJob() {
+    private JobResult() {
     }
 
-    public DoneJob(long jobKey, Result result, Map<String, Object> variables, int retries, String errorMessage) {
+    public JobResult(long jobKey, Result result, Map<String, Object> variables, int retries, String errorMessage) {
         Objects.requireNonNull(result);
 
         this.result = result;
@@ -37,7 +32,7 @@ public class DoneJob {
         this.errorMessage = errorMessage;
     }
 
-    public DoneJob(long jobKey, Result result, int retries) {
+    public JobResult(long jobKey, Result result, int retries) {
         this(jobKey, result, null, retries, null);
     }
 
@@ -85,8 +80,8 @@ public class DoneJob {
         return JsonObject.mapFrom(this);
     }
 
-    public static DoneJob fromJsonObject(JsonObject doneJob){
-        return doneJob.mapTo(DoneJob.class);
+    public static JobResult fromJsonObject(JsonObject doneJob){
+        return doneJob.mapTo(JobResult.class);
     }
 
 }

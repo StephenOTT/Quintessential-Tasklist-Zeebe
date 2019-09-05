@@ -1,6 +1,8 @@
-package com.github.stephenott;
+package com.github.stephenott.zeebe.client;
 
-import com.github.stephenott.configuration.ApplicationConfiguration;
+import com.github.stephenott.common.Common;
+import com.github.stephenott.executors.JobResult;
+import com.github.stephenott.conf.ApplicationConfiguration;
 import io.vertx.circuitbreaker.CircuitBreaker;
 import io.vertx.circuitbreaker.CircuitBreakerOptions;
 import io.vertx.core.*;
@@ -47,7 +49,6 @@ public class ZeebeClientVerticle extends AbstractVerticle {
                         .setResetTimeout(Duration.ofMinutes(30).toMillis())
         );
 
-
         eb = vertx.eventBus();
 
         zClient = createZeebeClient(clientConfiguration);
@@ -71,7 +72,6 @@ public class ZeebeClientVerticle extends AbstractVerticle {
                 eb.send("createJobConsumer", body, options);
             });
         });
-
     }
 
 
@@ -137,12 +137,12 @@ public class ZeebeClientVerticle extends AbstractVerticle {
 
     private void createJobCompletionConsumer(){
         eb.<JsonObject>consumer(clientConfiguration.getName() + ".job.completion").handler(msg->{
-            DoneJob doneJob = msg.body().mapTo(DoneJob.class);
+            JobResult jobResult = msg.body().mapTo(JobResult.class);
 
-            if (doneJob.getResult().equals(DoneJob.Result.COMPLETE)){
-                reportJobComplete(doneJob);
+            if (jobResult.getResult().equals(JobResult.Result.COMPLETE)){
+                reportJobComplete(jobResult);
             } else {
-                reportJobFail(doneJob);
+                reportJobFail(jobResult);
             }
         });
     }
@@ -194,16 +194,16 @@ public class ZeebeClientVerticle extends AbstractVerticle {
         eb.send(address, object, options);
     }
 
-    private Future<Void> reportJobComplete(DoneJob doneJob) {
+    private Future<Void> reportJobComplete(JobResult jobResult) {
         Promise<Void> promise = Promise.promise();
 
-        log.info("Reporting job is complete... {}", doneJob.getJobKey());
+        log.info("Reporting job is complete... {}", jobResult.getJobKey());
 
         vertx.executeBlocking(blkProm -> {
             //@TODO Add support for variables and custom timeout configs
             // Variables are currently not supported do to complications with the builder
             ZeebeFuture<Void> completeCommandFuture = zClient
-                    .newCompleteCommand(doneJob.getJobKey())
+                    .newCompleteCommand(jobResult.getJobKey())
                     .send();
 
             log.info("Sending Complete Command to Zeebe");
@@ -235,13 +235,13 @@ public class ZeebeClientVerticle extends AbstractVerticle {
     }
 
 
-    private Future<Void> reportJobFail(DoneJob doneJob) {
+    private Future<Void> reportJobFail(JobResult jobResult) {
         Promise<Void> promise = Promise.promise();
 
         vertx.executeBlocking(blkProm -> {
-            ZeebeFuture<Void> failCommandFuture = zClient.newFailCommand(doneJob.getJobKey())
-                    .retries(doneJob.getRetries())
-                    .errorMessage(doneJob.getErrorMessage())
+            ZeebeFuture<Void> failCommandFuture = zClient.newFailCommand(jobResult.getJobKey())
+                    .retries(jobResult.getRetries())
+                    .errorMessage(jobResult.getErrorMessage())
                     .send();
 
             log.info("Sending Fail-Command to Zeebe");

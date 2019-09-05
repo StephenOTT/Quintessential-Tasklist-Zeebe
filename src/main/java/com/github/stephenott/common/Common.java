@@ -1,4 +1,4 @@
-package com.github.stephenott;
+package com.github.stephenott.common;
 
 public class Common {
 

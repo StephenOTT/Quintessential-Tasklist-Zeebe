@@ -1,6 +1,8 @@
-package com.github.stephenott;
+package com.github.stephenott.executors.polyglot;
 
-import com.github.stephenott.configuration.ApplicationConfiguration;
+import com.github.stephenott.common.Common;
+import com.github.stephenott.executors.JobResult;
+import com.github.stephenott.conf.ApplicationConfiguration;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.json.JsonObject;
@@ -31,12 +33,12 @@ public class ExecutorVerticle extends AbstractVerticle {
 
             //@TODO Add polyexecutor
 
-            DoneJob doneJob = new DoneJob(
+            JobResult jobResult = new JobResult(
                     job.getLong("key"),
-                    DoneJob.Result.COMPLETE,
+                    JobResult.Result.COMPLETE,
                     (job.getInteger("retries") > 0) ? job.getInteger("retries") - 1 : 0);
 
-            eb.send(sourceClient + ".job-action.completion", doneJob.toJsonObject());
+            eb.send(sourceClient + ".job-action.completion", jobResult.toJsonObject());
 
         });
     }

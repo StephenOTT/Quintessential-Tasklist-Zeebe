@@ -3,15 +3,16 @@ package com.github.stephenott;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
-import com.github.stephenott.configuration.ApplicationConfiguration;
-import com.github.stephenott.usertask.UserTaskExecutorVerticle;
+import com.github.stephenott.conf.ApplicationConfiguration;
+import com.github.stephenott.executors.polyglot.ExecutorVerticle;
+import com.github.stephenott.form.validator.FormValidationServerHttpVerticle;
+import com.github.stephenott.managementserver.ManagementHttpVerticle;
+import com.github.stephenott.executors.usertask.UserTaskExecutorVerticle;
+import com.github.stephenott.zeebe.client.ZeebeClientVerticle;
 import io.vertx.config.ConfigRetriever;
 import io.vertx.config.ConfigRetrieverOptions;
 import io.vertx.config.ConfigStoreOptions;
-import io.vertx.core.AbstractVerticle;
-import io.vertx.core.DeploymentOptions;
-import io.vertx.core.Future;
-import io.vertx.core.Promise;
+import io.vertx.core.*;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
@@ -20,8 +21,10 @@ import org.slf4j.LoggerFactory;
 
 public class MainVerticle extends AbstractVerticle {
 
-    private EventBus eb;
     private Logger log = LoggerFactory.getLogger(MainVerticle.class);
+
+    private EventBus eb;
+
     private ConfigRetriever appConfigRetriever;
     ApplicationConfiguration appConfig;
 
@@ -32,9 +35,11 @@ public class MainVerticle extends AbstractVerticle {
 
         eb = vertx.eventBus();
 
-        setupAppConfig("zeebe.yml").setHandler(ac -> {
-            if (ac.succeeded()) {
-                appConfig = ac.result();
+        String configYmlPath = config().getString("configYmlPath");
+
+        retrieveAppConfig(configYmlPath, result -> {
+            if (result.succeeded()) {
+                appConfig = result.result();
 
                 appConfig.getExecutors().forEach(this::deployExecutorVerticle);
 
@@ -42,23 +47,27 @@ public class MainVerticle extends AbstractVerticle {
 
                 appConfig.getZeebe().getClients().forEach(this::deployZeebeClient);
 
-
-                if (appConfig.getManagementServer().isEnabled()){
+                if (appConfig.getManagementServer().isEnabled()) {
                     deployManagementClient(appConfig.getManagementServer());
                 }
 
+                if (appConfig.getFormValidatorServer().isEnabled()){
+                    deployFormValidationServer(appConfig.getFormValidatorServer());
+                }
+
             } else {
-                throw new IllegalStateException("Unable to read yml configuration", ac.cause());
+                throw new IllegalStateException("Unable to read yml configuration", result.cause());
             }
         });
     }
 
-    private void deployManagementClient(ApplicationConfiguration.ManagementHttpConfiguration config){
-        DeploymentOptions options = new DeploymentOptions();
-        options.setConfig(JsonObject.mapFrom(config));
+    private void deployManagementClient(ApplicationConfiguration.ManagementHttpConfiguration config) {
+        DeploymentOptions options = new DeploymentOptions()
+                .setInstances(config.getInstances())
+                .setConfig(JsonObject.mapFrom(config));
 
-        vertx.deployVerticle(ManagementHttpVerticle::new, options, deployResult ->{
-            if (deployResult.succeeded()){
+        vertx.deployVerticle(ManagementHttpVerticle::new, options, deployResult -> {
+            if (deployResult.succeeded()) {
                 log.info("Management Client has successfully deployed");
             } else {
                 log.error("Management Client failed to deploy", deployResult.cause());
@@ -66,30 +75,44 @@ public class MainVerticle extends AbstractVerticle {
         });
     }
 
+    private void deployFormValidationServer(ApplicationConfiguration.FormValidationServerConfiguration config) {
+        DeploymentOptions options = new DeploymentOptions()
+                .setInstances(config.getInstances())
+                .setConfig(JsonObject.mapFrom(config));
 
-    private void deployExecutorVerticle(ApplicationConfiguration.ExecutorConfiguration config){
-        DeploymentOptions options = new DeploymentOptions();
-        options.setInstances(config.getInstances());
-        options.setConfig(JsonObject.mapFrom(config));
-
-        vertx.deployVerticle(ExecutorVerticle::new, options, vert -> {
-            if (vert.succeeded()){
-                log.info("ZeebeWorker Verticle " + config.getName() + " has successfully deployed (" + config.getInstances() + " instances)");
+        vertx.deployVerticle(FormValidationServerHttpVerticle::new, options, deployResult -> {
+            if (deployResult.succeeded()) {
+                log.info("Form Validation Server has successfully deployed");
             } else {
-                log.error("ZeebeWorker Verticle " + config.getName() + " has failed to deploy!", vert.cause());
+                log.error("Form Validation Server failed to deploy", deployResult.cause());
             }
         });
     }
 
-    private void deployUserTaskExecutorVerticle(ApplicationConfiguration.UserTaskExecutorConfiguration config){
+
+    private void deployExecutorVerticle(ApplicationConfiguration.ExecutorConfiguration config) {
+        DeploymentOptions options = new DeploymentOptions()
+                .setInstances(config.getInstances())
+                .setConfig(JsonObject.mapFrom(config));
+
+        vertx.deployVerticle(ExecutorVerticle::new, options, vert -> {
+            if (vert.succeeded()) {
+                log.info("Executor Verticle " + config.getName() + " has successfully deployed (" + config.getInstances() + " instances)");
+            } else {
+                log.error("Executor Verticle " + config.getName() + " has failed to deploy!", vert.cause());
+            }
+        });
+    }
+
+    private void deployUserTaskExecutorVerticle(ApplicationConfiguration.UserTaskExecutorConfiguration config) {
         DeploymentOptions options = new DeploymentOptions();
         options.setConfig(JsonObject.mapFrom(config));
 
         vertx.deployVerticle(UserTaskExecutorVerticle::new, options, vert -> {
-            if (vert.succeeded()){
-                log.info("UserTaskExecutor Verticle " + config.getName() + " has successfully deployed");
+            if (vert.succeeded()) {
+                log.info("UserTask Executor Verticle " + config.getName() + " has successfully deployed");
             } else {
-                log.error("UserTaskExecutor Verticle " + config.getName() + " has failed to deploy!", vert.cause());
+                log.error("UserTask Executor Verticle " + config.getName() + " has failed to deploy!", vert.cause());
             }
         });
     }
@@ -100,17 +123,15 @@ public class MainVerticle extends AbstractVerticle {
 
         vertx.deployVerticle(ZeebeClientVerticle::new, options, vert -> {
             if (vert.succeeded()) {
-                log.info("ZeebeClient Verticle " + config.getName() + " has successfully deployed");
+                log.info("Zeebe Client Verticle " + config.getName() + " has successfully deployed");
             } else {
-                log.error("ZeebeClient Verticle " + config.getName() + " has failed to deploy!", vert.cause());
+                log.error("Zeebe Client Verticle " + config.getName() + " has failed to deploy!", vert.cause());
             }
         });
     }
 
 
-    private Future<ApplicationConfiguration> setupAppConfig(String filePath) {
-        Promise<ApplicationConfiguration> promise = Promise.promise();
-
+    private void retrieveAppConfig(String filePath, Handler<AsyncResult<ApplicationConfiguration>> result) {
         ConfigStoreOptions store = new ConfigStoreOptions()
                 .setType("file")
                 .setFormat("yaml")
@@ -120,14 +141,13 @@ public class MainVerticle extends AbstractVerticle {
 
         appConfigRetriever = ConfigRetriever.create(vertx, new ConfigRetrieverOptions().addStore(store));
 
-        appConfigRetriever.getConfig(handler -> {
-            if (handler.succeeded()) {
-                promise.complete(handler.result().mapTo(ApplicationConfiguration.class));
+        appConfigRetriever.getConfig(retrieverResult -> {
+            if (retrieverResult.succeeded()) {
+                result.handle(Future.succeededFuture(retrieverResult.result().mapTo(ApplicationConfiguration.class)));
 
             } else {
-                promise.fail(handler.cause());
+                result.handle(Future.failedFuture(retrieverResult.cause()));
             }
         });
-        return promise.future();
     }
 }

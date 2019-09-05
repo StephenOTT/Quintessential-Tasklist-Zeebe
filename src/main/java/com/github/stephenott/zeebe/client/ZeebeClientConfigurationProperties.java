@@ -1,4 +1,4 @@
-package com.github.stephenott;
+package com.github.stephenott.zeebe.client;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import io.vertx.core.json.JsonObject;

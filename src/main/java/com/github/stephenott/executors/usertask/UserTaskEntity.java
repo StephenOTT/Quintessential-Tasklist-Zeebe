@@ -1,4 +1,4 @@
-package com.github.stephenott.usertask;
+package com.github.stephenott.executors.usertask;
 
 import java.time.Instant;
 import java.util.Map;

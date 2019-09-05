@@ -1,6 +1,7 @@
-package com.github.stephenott;
+package com.github.stephenott.managementserver;
 
-import com.github.stephenott.configuration.ApplicationConfiguration;
+import com.github.stephenott.conf.ApplicationConfiguration;
+import com.github.stephenott.zeebe.client.CreateInstanceConfiguration;
 import io.vertx.core.*;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.http.HttpMethod;

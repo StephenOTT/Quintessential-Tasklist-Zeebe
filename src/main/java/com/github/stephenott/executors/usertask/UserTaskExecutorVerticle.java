@@ -1,9 +1,8 @@
-package com.github.stephenott.usertask;
+package com.github.stephenott.executors.usertask;
 
-
-import com.github.stephenott.Common;
-import com.github.stephenott.configuration.ApplicationConfiguration;
-import com.github.stephenott.DoneJob;
+import com.github.stephenott.common.Common;
+import com.github.stephenott.conf.ApplicationConfiguration;
+import com.github.stephenott.executors.JobResult;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.json.Json;
@@ -21,21 +20,23 @@ public class UserTaskExecutorVerticle extends AbstractVerticle {
     private final Logger log = LoggerFactory.getLogger(UserTaskExecutorVerticle.class);
 
     private EventBus eb;
-    private ApplicationConfiguration.UserTaskExecutorConfiguration utWorkerConfig;
+
+    private ApplicationConfiguration.UserTaskExecutorConfiguration utExecutorConfig;
 
     @Override
     public void start() throws Exception {
-        utWorkerConfig = config().mapTo(ApplicationConfiguration.UserTaskExecutorConfiguration.class);
+        utExecutorConfig = config().mapTo(ApplicationConfiguration.UserTaskExecutorConfiguration.class);
 
         eb = vertx.eventBus();
 
-        String address = Common.JOB_ADDRESS_PREFIX + utWorkerConfig.getAddress();
+        String address = Common.JOB_ADDRESS_PREFIX + utExecutorConfig.getAddress();
 
         eb.<JsonObject>consumer(address, handler -> {
 
-            log.info("User Task has captured some Work...");
+            log.info("User Task({}) has captured some Work.", address);
 
             String sourceClient = handler.headers().get("sourceClient");
+            //@TODO add handler if sourceClient is missing then reject job.
 
             UserTaskConfiguration utConfig = handler.body()
                     .getJsonObject("customHeaders")
@@ -59,15 +60,15 @@ public class UserTaskExecutorVerticle extends AbstractVerticle {
 
             log.info("User Task created: {}", JsonObject.mapFrom(utEntity).toString());
 
-            DoneJob doneJob = new DoneJob(
+            JobResult jobResult = new JobResult(
                     utEntity.getZeebeJobKey(),
-                    DoneJob.Result.COMPLETE, 0);
+                    JobResult.Result.COMPLETE, 0);
 
-            eb.send(sourceClient + ".job-action.completion", doneJob.toJsonObject());
+            eb.send(sourceClient + ".job-action.completion", jobResult.toJsonObject());
 
         });
 
-        log.info("User Task Verticle consuming tasks at: {}", utWorkerConfig.getAddress());
+        log.info("User Task Executor Verticle consuming tasks at: {}", utExecutorConfig.getAddress());
     }
 
     public void saveEntitytoDb(UserTaskEntity entity){

@@ -329,7 +329,7 @@ The variables will be injected into the created workflow instace.
 1. TODO fix up the logging to be DEBUG and cleanup the language as the standard is all over the place at the moment.  Also inlcude more context info for when reading the log as its unclear.
 1. TODO ***** Add the defaults logic for the User Task assignments, where if the headers that are not provided in zeebe then the user tasks entity will default to those configured values.
 1. TODO add the overrides logic: where if a override is provided then only the logic from the override is used and the provided header does not matter
-
+1. TODO Refactor error handling on HTTP requests to provider better json errors
 
 ```xml
 ...
