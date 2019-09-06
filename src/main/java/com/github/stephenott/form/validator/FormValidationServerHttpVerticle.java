@@ -103,6 +103,10 @@ public class FormValidationServerHttpVerticle extends AbstractVerticle {
         });
     }
 
+    private void establishFormValidationEbConsumer(){
+        //@TODO
+    }
+
     public void validateFormSubmission(ValidationRequest validationRequest, Handler<AsyncResult<ValidationResult.Type>> handler) {
         //@TODO Refactor this to reduce the wordiness...
         ApplicationConfiguration.FormValidatorServiceConfiguration validatorConfig = formValidationServerConfig.getFormValidatorService();
