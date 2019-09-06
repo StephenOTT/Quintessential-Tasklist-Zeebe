@@ -11,6 +11,8 @@ import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.mongo.MongoClient;
+import io.zeebe.client.api.response.ActivatedJob;
+import io.zeebe.client.impl.response.ActivatedJobImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,6 +67,7 @@ public class UserTaskExecutorVerticle extends AbstractVerticle {
                     .setZeebeDeadline(Instant.ofEpochMilli(handler.body().getLong("deadline")))
                     .setZeebeJobKey(handler.body().getLong("key"))
                     .setBpmnProcessId(handler.body().getString("bpmnProcessId"))
+                    .setBpmnProcessVersion(handler.body().getInteger("workflowDefinitionVersion"))
                     .setZeebeVariables(((JsonObject)Json.decodeValue(handler.body().getString("variables"))).getMap())
                     .setTaskOriginalCapture(Instant.now());
 

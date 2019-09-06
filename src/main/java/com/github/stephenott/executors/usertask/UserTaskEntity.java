@@ -25,6 +25,7 @@ public class UserTaskEntity {
     private Instant zeebeDeadline;
     private long zeebeJobKey;
     private String bpmnProcessId;
+    private int bpmnProcessVersion;
     private Map<String, Object> zeebeVariables;
 
     private Map<String, Object> metadata;
@@ -146,6 +147,15 @@ public class UserTaskEntity {
 
     public UserTaskEntity setBpmnProcessId(String bpmnProcessId) {
         this.bpmnProcessId = bpmnProcessId;
+        return this;
+    }
+
+    public int getBpmnProcessVersion() {
+        return bpmnProcessVersion;
+    }
+
+    public UserTaskEntity setBpmnProcessVersion(int bpmnProcessVersion) {
+        this.bpmnProcessVersion = bpmnProcessVersion;
         return this;
     }
 
