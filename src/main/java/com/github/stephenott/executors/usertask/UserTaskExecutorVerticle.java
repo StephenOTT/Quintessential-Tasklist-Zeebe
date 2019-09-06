@@ -65,7 +65,8 @@ public class UserTaskExecutorVerticle extends AbstractVerticle {
                     .setZeebeDeadline(Instant.ofEpochMilli(handler.body().getLong("deadline")))
                     .setZeebeJobKey(handler.body().getLong("key"))
                     .setBpmnProcessId(handler.body().getString("bpmnProcessId"))
-                    .setZeebeVariables(((JsonObject)Json.decodeValue(handler.body().getString("variables"))).getMap());
+                    .setZeebeVariables(((JsonObject)Json.decodeValue(handler.body().getString("variables"))).getMap())
+                    .setTaskOriginalCapture(Instant.now());
 
             log.info("User Task created: {}", JsonObject.mapFrom(utEntity).toString());
 
@@ -74,10 +75,11 @@ public class UserTaskExecutorVerticle extends AbstractVerticle {
                     JobResult jobResult = new JobResult(
                             utEntity.getZeebeJobKey(),
                             JobResult.Result.COMPLETE, 0);
-                    
+
                     eb.send(sourceClient + ".job-action.completion", jobResult.toJsonObject());
 
                 } else {
+                    //@TODO update with better error
                    throw new IllegalStateException("Unable to save to DB", res.cause());
                 }
             });
