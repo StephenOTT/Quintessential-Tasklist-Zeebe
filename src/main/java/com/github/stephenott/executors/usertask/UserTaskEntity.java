@@ -10,6 +10,8 @@ import java.util.Set;
 public class UserTaskEntity {
 
     private String taskId;
+    private Instant taskOriginalCapture = Instant.now();
+
     private String title;
     private String description;
     private int priority = 0;
@@ -18,12 +20,14 @@ public class UserTaskEntity {
     private Set<String> candidateUsers;
     private Instant dueDate;
     private String formKey;
+
     private String zeebeSource;
     private Instant zeebeDeadline;
     private long zeebeJobKey;
     private String bpmnProcessId;
-    private Map<String, Object> metadata;
     private Map<String, Object> zeebeVariables;
+
+    private Map<String, Object> metadata;
 
     public UserTaskEntity() {
     }
@@ -163,8 +167,31 @@ public class UserTaskEntity {
         return this;
     }
 
+    public Instant getTaskOriginalCapture() {
+        return taskOriginalCapture;
+    }
+
+    public UserTaskEntity setTaskOriginalCapture(Instant taskOriginalCapture) {
+        this.taskOriginalCapture = taskOriginalCapture;
+        return this;
+    }
+
     public JsonObject toMongoJson() {
-        return JsonObject.mapFrom(this)
-                .put("zeebeDeadline", new JsonObject().put(JsonObjectCodec.DATE_FIELD, this.getZeebeDeadline()));
+        JsonObject object = JsonObject.mapFrom(this);
+        //@TODO Refactor to use views or something
+
+        if (getZeebeDeadline() != null){
+            object.put("zeebeDeadline", new JsonObject().put(JsonObjectCodec.DATE_FIELD, this.getZeebeDeadline()));
+        }
+
+        if (getTaskOriginalCapture() != null){
+            object.put("taskOriginalCapture", new JsonObject().put(JsonObjectCodec.DATE_FIELD, this.getTaskOriginalCapture()));
+        }
+
+        if (getDueDate() != null){
+            object.put("dueDate", new JsonObject().put(JsonObjectCodec.DATE_FIELD, this.getDueDate()));
+        }
+
+        return object;
     }
 }
