@@ -1,16 +1,22 @@
-package com.github.stephenott.executors.usertask;
+package com.github.stephenott.usertask;
 
-import io.vertx.core.json.JsonObject;
-import io.vertx.ext.mongo.impl.codec.json.JsonObjectCodec;
+import org.bson.codecs.pojo.annotations.BsonDiscriminator;
+import org.bson.codecs.pojo.annotations.BsonId;
 
 import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
 
+//@TODO Refactor to enable proper serialization of Instant for JsonObject
+@BsonDiscriminator
 public class UserTaskEntity {
 
+    @BsonId
     private String taskId;
+
     private Instant taskOriginalCapture = Instant.now();
+
+    private State state = State.NEW;
 
     private String title;
     private String description;
@@ -20,7 +26,11 @@ public class UserTaskEntity {
     private Set<String> candidateUsers;
     private Instant dueDate;
     private String formKey;
-
+    private Instant newAt = Instant.now();
+    private Instant assignedAt;
+    private Instant delegatedAt;
+    private Instant completedAt;
+    private Map<String, Object> variablesSubmittedOnCompletion;
     private String zeebeSource;
     private Instant zeebeDeadline;
     private long zeebeJobKey;
@@ -31,6 +41,14 @@ public class UserTaskEntity {
     private Map<String, Object> metadata;
 
     public UserTaskEntity() {
+    }
+
+    public enum State {
+        NEW,
+        ASSIGNED,
+        UNASSIGNED,
+        DELEGATED,
+        COMPLETED
     }
 
     public String getTaskId() {
@@ -114,6 +132,60 @@ public class UserTaskEntity {
         return this;
     }
 
+    public State getState() {
+        return state;
+    }
+
+    public UserTaskEntity setState(State state) {
+        this.state = state;
+        return this;
+    }
+
+    public Instant getNewAt() {
+        return newAt;
+    }
+
+    public UserTaskEntity setNewAt(Instant newAt) {
+        this.newAt = newAt;
+        return this;
+    }
+
+    public Instant getAssignedAt() {
+        return assignedAt;
+    }
+
+    public UserTaskEntity setAssignedAt(Instant assignedAt) {
+        this.assignedAt = assignedAt;
+        return this;
+    }
+
+    public Instant getDelegatedAt() {
+        return delegatedAt;
+    }
+
+    public UserTaskEntity setDelegatedAt(Instant delegatedAt) {
+        this.delegatedAt = delegatedAt;
+        return this;
+    }
+
+    public Instant getCompletedAt() {
+        return completedAt;
+    }
+
+    public UserTaskEntity setCompletedAt(Instant completedAt) {
+        this.completedAt = completedAt;
+        return this;
+    }
+
+    public Map<String, Object> getVariablesSubmittedOnCompletion() {
+        return variablesSubmittedOnCompletion;
+    }
+
+    public UserTaskEntity setVariablesSubmittedOnCompletion(Map<String, Object> variablesSubmittedOnCompletion) {
+        this.variablesSubmittedOnCompletion = variablesSubmittedOnCompletion;
+        return this;
+    }
+
     public String getZeebeSource() {
         return zeebeSource;
     }
@@ -184,24 +256,5 @@ public class UserTaskEntity {
     public UserTaskEntity setTaskOriginalCapture(Instant taskOriginalCapture) {
         this.taskOriginalCapture = taskOriginalCapture;
         return this;
-    }
-
-    public JsonObject toMongoJson() {
-        JsonObject object = JsonObject.mapFrom(this);
-        //@TODO Refactor to use views or something
-
-        if (getZeebeDeadline() != null){
-            object.put("zeebeDeadline", new JsonObject().put(JsonObjectCodec.DATE_FIELD, this.getZeebeDeadline()));
-        }
-
-        if (getTaskOriginalCapture() != null){
-            object.put("taskOriginalCapture", new JsonObject().put(JsonObjectCodec.DATE_FIELD, this.getTaskOriginalCapture()));
-        }
-
-        if (getDueDate() != null){
-            object.put("dueDate", new JsonObject().put(JsonObjectCodec.DATE_FIELD, this.getDueDate()));
-        }
-
-        return object;
     }
 }

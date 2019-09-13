@@ -2,12 +2,17 @@ zeebe:
   clients:
     - name: MyCustomClient
       brokerContactPoint: "localhost:25600"
-      requestTimeout: PT10S
+      requestTimeout: PT20S
       workers:
-        - name: MyWorker
+        - name: SimpleScriptWorker
           jobTypes:
             - type1
+          timeout: PT10S
+        - name: UT-Worker
+          jobTypes:
             - ut.generic
+          timeout: P1D
+
 executors:
   - name: Script-Executor
     address: "type1"

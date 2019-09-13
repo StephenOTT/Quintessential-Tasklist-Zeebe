@@ -55,21 +55,19 @@ public class ZeebeClientVerticle extends AbstractVerticle {
 
         createJobCompletionConsumer();
 
-        eb.<JsonObject>localConsumer("createJobConsumer", act -> {
+        eb.<JsonObject>localConsumer("createJobWorker", act -> {
             String jobType = act.body().getString("jobType");
-            String consumerName = act.body().getString("consumerName");
-            createJobConsumer(jobType, consumerName);
+            String workerName = act.body().getString("workerName");
+            String timeout =  act.body().getString("timeout");
+            createJobWorker(jobType, workerName, timeout);
         });
 
         // Consumers are equal to "Zeebe Workers"
-        clientConfiguration.getWorkers().forEach(consumer -> {
-            consumer.getJobTypes().forEach(jobType -> {
-                JsonObject body = new JsonObject()
-                        .put("jobType", jobType)
-                        .put("consumerName", consumer.getName());
-
-                DeliveryOptions options = new DeliveryOptions().setLocalOnly(true);
-                eb.send("createJobConsumer", body, options);
+        clientConfiguration.getWorkers().forEach(worker -> {
+            log.info("Calling for launch of Worker " + worker.getName());
+            log.info("------------>TIMEOUT: " + worker.getTimeout().toString());
+            worker.getJobTypes().forEach(jobType -> {
+                createJobWorkerWithEb(jobType, worker.getName(), worker.getTimeout());
             });
         });
     }
@@ -78,9 +76,10 @@ public class ZeebeClientVerticle extends AbstractVerticle {
     private ZeebeClient createZeebeClient(ApplicationConfiguration.ZeebeClientConfiguration configuration) {
         log.info("Creating ZeebeClient for " + clientConfiguration.getName());
 
+        //@TODO add defaults from the App Config
         return ZeebeClient.newClientBuilder()
                 .brokerContactPoint(configuration.getBrokerContactPoint())
-                .defaultRequestTimeout(Duration.ofMinutes(1L))
+                .defaultRequestTimeout(configuration.getRequestTimeout()) //@TODO Review a possible bug where if there is a PT10S, the request seems to go forever (could be because of alpha1)
                 .defaultMessageTimeToLive(Duration.ofHours(1))
                 .usePlaintext() //@TODO remove and replace with cert  /-/SECURITY/-/
                 .build();
@@ -91,20 +90,21 @@ public class ZeebeClientVerticle extends AbstractVerticle {
         zClient.close();
     }
 
-    private void createJobConsumerWithEb(String jobType, String workerName) {
+    private void createJobWorkerWithEb(String jobType, String workerName, Duration timeout) {
         JsonObject body = new JsonObject()
                 .put("jobType", jobType)
-                .put("consumerName", workerName);
+                .put("workerName", workerName)
+                .put("timeout", timeout.toString());
 
         DeliveryOptions options = new DeliveryOptions().setLocalOnly(true);
-        eb.publish("createJobConsumer", body, options);
+        eb.send("createJobWorker", body, options);
     }
 
-    private void createJobConsumer(String jobType, String workerName) {
+    private void createJobWorker(String jobType, String workerName, String timeout) {
 
 //        pollingBreaker.execute(brkCmd -> {
 
-            pollForJobs(jobType, workerName, pollResult -> {
+            pollForJobs(jobType, workerName, timeout, pollResult -> {
 
                 if (pollResult.succeeded()) {
 //                    brkCmd.complete();
@@ -114,7 +114,7 @@ public class ZeebeClientVerticle extends AbstractVerticle {
 //                        brkCmd.complete();
                         log.info(workerName + " found NO Jobs for " + jobType + ", looping...");
 
-                        createJobConsumerWithEb(jobType, workerName);
+                        createJobWorkerWithEb(jobType, workerName, Duration.parse(timeout));
 
                         //If found jobs in the results of the poll:
                     } else {
@@ -125,9 +125,10 @@ public class ZeebeClientVerticle extends AbstractVerticle {
 
                         log.info("Done handling jobs....");
 
-                        createJobConsumerWithEb(jobType, workerName); //Basically a non-blocking loop
+                        createJobWorkerWithEb(jobType, workerName, Duration.parse(timeout)); //Basically a non-blocking loop
                     }
                 } else {
+                    log.error("POLLING ERROR: ---->", pollResult.cause());
 //                    brkCmd.fail(pollResult.cause());
                 }
             }); // End of Poll
@@ -147,7 +148,7 @@ public class ZeebeClientVerticle extends AbstractVerticle {
         });
     }
 
-    private void pollForJobs(String jobType, String workerName, Handler<AsyncResult<List<ActivatedJob>>> handler) {
+    private void pollForJobs(String jobType, String workerName, String timeout, Handler<AsyncResult<List<ActivatedJob>>> handler) {
         log.info("Starting Activate Jobs Command for: " + jobType + "  " + workerName);
 
         //Convert to a dedicated Verticle / Thread Worker management
@@ -159,7 +160,7 @@ public class ZeebeClientVerticle extends AbstractVerticle {
                                 .jobType(jobType)
                                 .maxJobsToActivate(1)
                                 .workerName(workerName)
-                                .requestTimeout(Duration.ofMinutes(1L));
+                                .timeout(Duration.parse(timeout));
 
                         ZeebeFuture<ActivateJobsResponse> jobsResponse = finalCommandStep.send();
 
@@ -253,9 +254,7 @@ public class ZeebeClientVerticle extends AbstractVerticle {
 
                 blkProm.complete();
 
-            } catch (ClientStatusException e) {
-                blkProm.fail(e);
-            } catch (ClientException e) {
+            } catch (Exception e) {
                 blkProm.fail(e);
             }
 

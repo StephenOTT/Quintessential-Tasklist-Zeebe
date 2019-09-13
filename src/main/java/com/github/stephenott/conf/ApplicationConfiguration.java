@@ -80,7 +80,7 @@ public class ApplicationConfiguration {
         private String brokerContactPoint = "localhost:25600";
 
         @JsonFormat(shape = JsonFormat.Shape.STRING)
-        private Duration requestTimeout;
+        private Duration requestTimeout = Duration.ofSeconds(10);
 
         private List<ZeebeWorkers> workers;
 
@@ -125,6 +125,9 @@ public class ApplicationConfiguration {
         private String name;
         private List<String> jobTypes;
 
+        @JsonFormat(shape = JsonFormat.Shape.STRING)
+        private Duration timeout = Duration.ofSeconds(10);
+
         public ZeebeWorkers() {
         }
 
@@ -142,6 +145,19 @@ public class ApplicationConfiguration {
 
         public void setJobTypes(List<String> jobTypes) {
             this.jobTypes = jobTypes;
+        }
+
+        /**
+         * The Timeout of how long the Job is locked to the worker / subscription
+         * @return
+         */
+        public Duration getTimeout() {
+            return timeout;
+        }
+
+        public ZeebeWorkers setTimeout(Duration timeout) {
+            this.timeout = timeout;
+            return this;
         }
     }
 

@@ -18,7 +18,12 @@ public class ExecutorVerticle extends AbstractVerticle {
 
     @Override
     public void start() throws Exception {
-        executorConfiguration = config().mapTo(ApplicationConfiguration.ExecutorConfiguration.class);
+        try {
+            executorConfiguration = config().mapTo(ApplicationConfiguration.ExecutorConfiguration.class);
+            log.info("Executor Config: " + JsonObject.mapFrom(executorConfiguration).toString());
+        } catch (Exception e){
+            throw new IllegalStateException("Could not load executor configuration");
+        }
 
         eb = vertx.eventBus();
 

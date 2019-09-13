@@ -1,14 +1,20 @@
 package com.github.stephenott;
 
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import com.github.stephenott.conf.ApplicationConfiguration;
 import com.github.stephenott.executors.polyglot.ExecutorVerticle;
+import com.github.stephenott.executors.usertask.UserTaskExecutorVerticle;
 import com.github.stephenott.form.validator.FormValidationServerHttpVerticle;
 import com.github.stephenott.managementserver.ManagementHttpVerticle;
-import com.github.stephenott.executors.usertask.UserTaskExecutorVerticle;
+import com.github.stephenott.usertask.UserTaskActionsVerticle;
+import com.github.stephenott.usertask.UserTaskHttpServerVerticle;
+import com.github.stephenott.usertask.mongo.MongoManager;
 import com.github.stephenott.zeebe.client.ZeebeClientVerticle;
+import com.mongodb.MongoClientSettings;
+import com.mongodb.reactivestreams.client.MongoClients;
 import io.vertx.config.ConfigRetriever;
 import io.vertx.config.ConfigRetrieverOptions;
 import io.vertx.config.ConfigStoreOptions;
@@ -16,8 +22,13 @@ import io.vertx.core.*;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
+import org.bson.codecs.configuration.CodecRegistry;
+import org.bson.codecs.pojo.PojoCodecProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
+import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
 public class MainVerticle extends AbstractVerticle {
 
@@ -32,6 +43,9 @@ public class MainVerticle extends AbstractVerticle {
     public void start() throws Exception {
         Json.mapper.registerModules(new ParameterNamesModule(), new Jdk8Module(), new JavaTimeModule());
         Json.prettyMapper.registerModules(new ParameterNamesModule(), new Jdk8Module(), new JavaTimeModule());
+        Json.mapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+        Json.prettyMapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+
 
         eb = vertx.eventBus();
 
@@ -40,6 +54,21 @@ public class MainVerticle extends AbstractVerticle {
         retrieveAppConfig(configYmlPath, result -> {
             if (result.succeeded()) {
                 appConfig = result.result();
+
+                //Setup Mongo:
+                CodecRegistry registry = fromRegistries(
+                        MongoClients.getDefaultCodecRegistry(),
+                        fromProviders(PojoCodecProvider.builder()
+                                .automatic(true)
+                                .build())
+                        );
+                MongoClientSettings mSettings = MongoClientSettings.builder()
+                        .codecRegistry(registry)
+                        .build();
+                MongoManager.setClient(MongoClients.create(mSettings));
+
+                vertx.deployVerticle(UserTaskActionsVerticle.class, new DeploymentOptions()); //@TODO refactor this
+                vertx.deployVerticle(UserTaskHttpServerVerticle.class, new DeploymentOptions());
 
                 appConfig.getExecutors().forEach(this::deployExecutorVerticle);
 
