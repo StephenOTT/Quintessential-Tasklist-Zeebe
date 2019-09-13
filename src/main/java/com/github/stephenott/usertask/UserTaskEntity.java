@@ -14,6 +14,8 @@ public class UserTaskEntity {
     @BsonId
     private String taskId;
 
+    private long olVersion = 1L;
+
     private Instant taskOriginalCapture = Instant.now();
 
     private State state = State.NEW;
@@ -57,6 +59,24 @@ public class UserTaskEntity {
 
     public UserTaskEntity setTaskId(String taskId) {
         this.taskId = taskId;
+        return this;
+    }
+
+    /**
+     * Gets the optimistic locking version number
+     * @return
+     */
+    public long getOlVersion() {
+        return olVersion;
+    }
+
+    /**
+     * Set the optimistic locking version number
+     * @param olVersion
+     * @return
+     */
+    public UserTaskEntity setOlVersion(long olVersion) {
+        this.olVersion = olVersion;
         return this;
     }
 

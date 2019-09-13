@@ -1,11 +1,19 @@
 package com.github.stephenott.usertask;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.github.stephenott.common.EventBusable;
+
 import java.util.Map;
 
-public class CompletionRequest {
+public class CompletionRequest implements EventBusable {
 
+    @JsonProperty("job")
     private long zeebeJobKey;
+
+    @JsonProperty("source")
     private String zeebeSource;
+
+    @JsonProperty("variables")
     private Map<String, Object> completionVariables;
 
 

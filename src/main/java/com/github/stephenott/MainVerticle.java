@@ -4,11 +4,14 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
+import com.github.stephenott.common.GenericJsonObjectMessageCodec;
 import com.github.stephenott.conf.ApplicationConfiguration;
 import com.github.stephenott.executors.polyglot.ExecutorVerticle;
 import com.github.stephenott.executors.usertask.UserTaskExecutorVerticle;
 import com.github.stephenott.form.validator.FormValidationServerHttpVerticle;
 import com.github.stephenott.managementserver.ManagementHttpVerticle;
+import com.github.stephenott.usertask.CompletionRequest;
+import com.github.stephenott.usertask.DbActionResult;
 import com.github.stephenott.usertask.UserTaskActionsVerticle;
 import com.github.stephenott.usertask.UserTaskHttpServerVerticle;
 import com.github.stephenott.usertask.mongo.MongoManager;
@@ -48,6 +51,9 @@ public class MainVerticle extends AbstractVerticle {
 
 
         eb = vertx.eventBus();
+
+        eb.registerCodec(new GenericJsonObjectMessageCodec<>(DbActionResult.class));
+        eb.registerCodec(new GenericJsonObjectMessageCodec<>(CompletionRequest.class));
 
         String configYmlPath = config().getString("configYmlPath");
 

@@ -1,6 +1,8 @@
 package com.github.stephenott.usertask;
 
 import io.vertx.core.AbstractVerticle;
+import io.vertx.core.Handler;
+import io.vertx.core.MultiMap;
 import io.vertx.core.eventbus.DeliveryOptions;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.http.HttpMethod;
@@ -9,9 +11,12 @@ import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Route;
 import io.vertx.ext.web.Router;
+import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static com.github.stephenott.usertask.UserTaskHttpServerVerticle.HttpUtils.*;
 
 public class UserTaskHttpServerVerticle extends AbstractVerticle {
 
@@ -40,6 +45,11 @@ public class UserTaskHttpServerVerticle extends AbstractVerticle {
                     .end("DOG-task: " + failure.failure().getLocalizedMessage());
         });
 
+        mainRouter.errorHandler(500, rc -> {
+           log.error("HTTP FAILURE!!!", rc.failure());
+            rc.fail(500);
+        });
+
         establishCompleteActionRoute(mainRouter);
 
         server.requestHandler(mainRouter)
@@ -56,35 +66,24 @@ public class UserTaskHttpServerVerticle extends AbstractVerticle {
 
         String address = "ut.action.complete";
 
-        DeliveryOptions options = new DeliveryOptions();
+        Route completeRoute = router.post("/task/complete")
+                .handler(BodyHandler.create()); //@TODO add cors
 
-        Route route = router.route(HttpMethod.POST, "/task/complete")
-                .consumes("application/json")
-                .produces("application/json");
+        completeRoute.handler(rc -> {
+            CompletionRequest completionRequest = rc.getBodyAsJson().mapTo(CompletionRequest.class);
 
-        //@TODO add cors
+            DeliveryOptions options = new DeliveryOptions().setCodecName("com.github.stephenott.usertask.CompletionRequest");
 
-        route.handler(BodyHandler.create());
+            eb.<DbActionResult>request(address, completionRequest, options, reply -> {
+                if (reply.succeeded()) {
+                    addCommonHeaders(rc.response());
 
-        route.handler(rc -> {
-            CompletionRequest completionRequest;
-            try {
-                completionRequest = rc.getBodyAsJson().mapTo(CompletionRequest.class);
+                    rc.response().end(JsonObject.mapFrom(reply.result().body()).toBuffer());
 
-                eb.<JsonObject>request(address, JsonObject.mapFrom(completionRequest), options, handler -> {
-                    if (handler.succeeded()) {
-                        rc.response()
-                                .putHeader("content-type", "application/json")
-                                .end(handler.result().body().toBuffer());
-                    } else {
-                        rc.fail(403, handler.cause());
-                    }
-                });
-
-            } catch (Exception e) {
-                log.error("Unable to process completion request payment from HTTP request", e);
-                rc.fail(403, e);
-            }
+                } else {
+                    throw new IllegalStateException(reply.cause());
+                }
+            });
 
         });
 
@@ -120,4 +119,18 @@ public class UserTaskHttpServerVerticle extends AbstractVerticle {
         // Will use a custom BPMN that allows a custom single step task to be created.
         // Create a config for this so the BPMN Process ID can be set in the YAML config
     }
+
+    public static class HttpUtils {
+
+        public static String applicationJson = "application/json";
+
+        public static HttpServerResponse addCommonHeaders(HttpServerResponse httpServerResponse){
+            httpServerResponse.headers()
+                    .add("content-type", applicationJson);
+
+            return httpServerResponse;
+        }
+
+    }
+
 }
