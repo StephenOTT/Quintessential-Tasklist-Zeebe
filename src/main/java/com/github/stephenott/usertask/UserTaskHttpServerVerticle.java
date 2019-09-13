@@ -74,7 +74,7 @@ public class UserTaskHttpServerVerticle extends AbstractVerticle {
                 eb.<JsonObject>request(address, JsonObject.mapFrom(completionRequest), options, handler -> {
                     if (handler.succeeded()) {
                         rc.response()
-                                .putHeader("Content-Type", "application/json")
+                                .putHeader("content-type", "application/json")
                                 .end(handler.result().body().toBuffer());
                     } else {
                         rc.fail(403, handler.cause());
