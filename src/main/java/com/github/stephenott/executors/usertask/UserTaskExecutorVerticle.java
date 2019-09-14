@@ -4,7 +4,7 @@ import com.github.stephenott.common.Common;
 import com.github.stephenott.conf.ApplicationConfiguration;
 import com.github.stephenott.executors.JobResult;
 import com.github.stephenott.usertask.mongo.MongoManager;
-import com.github.stephenott.usertask.UserTaskEntity;
+import com.github.stephenott.usertask.entity.UserTaskEntity;
 import com.github.stephenott.usertask.mongo.Subscribers.AsyncResultSubscriber;
 import com.mongodb.reactivestreams.client.MongoCollection;
 import com.mongodb.reactivestreams.client.Success;
@@ -34,7 +34,12 @@ public class UserTaskExecutorVerticle extends AbstractVerticle {
 
     @Override
     public void start() throws Exception {
-        utExecutorConfig = config().mapTo(ApplicationConfiguration.UserTaskExecutorConfiguration.class);
+        try{
+            utExecutorConfig = config().mapTo(ApplicationConfiguration.UserTaskExecutorConfiguration.class);
+        } catch (Exception e){
+            log.error("Unable to parse Ut Executor Config", e);
+            throw e;
+        }
 
         eb = vertx.eventBus();
 

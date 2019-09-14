@@ -1,10 +1,7 @@
 package com.github.stephenott.usertask.mongo;
 
-import com.github.stephenott.usertask.UserTaskEntity;
 import com.mongodb.reactivestreams.client.MongoClient;
-import com.mongodb.reactivestreams.client.MongoCollection;
 import com.mongodb.reactivestreams.client.MongoDatabase;
-import org.bson.Document;
 
 public class MongoManager {
 

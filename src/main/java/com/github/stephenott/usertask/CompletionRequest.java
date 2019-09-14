@@ -7,10 +7,11 @@ import java.util.Map;
 
 public class CompletionRequest implements EventBusable {
 
-    @JsonProperty("job")
+
+    @JsonProperty(value = "job", required = true)
     private long zeebeJobKey;
 
-    @JsonProperty("source")
+    @JsonProperty(value = "source", required = true)
     private String zeebeSource;
 
     @JsonProperty("variables")

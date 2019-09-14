@@ -1,4 +1,4 @@
-package com.github.stephenott.usertask;
+package com.github.stephenott.usertask.entity;
 
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 import org.bson.codecs.pojo.annotations.BsonId;
@@ -7,7 +7,6 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
 
-//@TODO Refactor to enable proper serialization of Instant for JsonObject
 @BsonDiscriminator
 public class UserTaskEntity {
 

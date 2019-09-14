@@ -1,21 +1,27 @@
 package com.github.stephenott.usertask;
 
+import com.github.stephenott.usertask.entity.UserTaskEntity;
 import com.github.stephenott.usertask.mongo.MongoManager;
 import com.github.stephenott.usertask.mongo.Subscribers.AsyncResultSubscriber;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
+import com.mongodb.reactivestreams.client.FindPublisher;
 import com.mongodb.reactivestreams.client.MongoCollection;
 import io.vertx.core.*;
 import io.vertx.core.eventbus.DeliveryOptions;
 import io.vertx.core.eventbus.EventBus;
-import io.vertx.core.json.JsonObject;
+import org.bson.BsonDocument;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.github.stephenott.usertask.DbActionResult.ActionResult.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+import static com.github.stephenott.usertask.DbActionResult.*;
 
 public class UserTaskActionsVerticle extends AbstractVerticle {
 
@@ -27,14 +33,12 @@ public class UserTaskActionsVerticle extends AbstractVerticle {
 
     @Override
     public void start() throws Exception {
-
         log.info("Starting UserTaskActionsVerticle");
 
         eb = vertx.eventBus();
 
-
         establishCompleteActionConsumer();
-
+        establishGetActionConsumer();
     }
 
     @Override
@@ -46,30 +50,43 @@ public class UserTaskActionsVerticle extends AbstractVerticle {
         String address = "ut.action.complete";
 
         eb.<CompletionRequest>consumer(address, ebHandler -> {
-//            CompletionRequest completionRequest;
-//            try {
-//                completionRequest = ebHandler.body().mapTo(CompletionRequest.class);
 
             completeTask(ebHandler.body()).setHandler(mHandler -> {
                 DeliveryOptions options = new DeliveryOptions().setCodecName("com.github.stephenott.usertask.DbActionResult");
+
                 if (mHandler.succeeded()) {
-                    DbActionResult result = new DbActionResult(SUCCESS, JsonObject.mapFrom(mHandler.result()));
-                    ebHandler.reply(result, options);
+                    ebHandler.reply(SuccessfulAction(Collections.singletonList(mHandler.result())), options);
                     log.info("Document was updated with Task Completion, new doc: " + mHandler.result().toString());
 
                 } else {
-                    DbActionResult result = new DbActionResult(FAIL, mHandler.cause());
-                    ebHandler.reply(result, options);
+                    ebHandler.reply(FailedAction(mHandler.cause()), options);
                     log.error("Could not complete Mongo command to Update doc to COMPLETE", mHandler.cause());
                 }
             });
 
-//            } catch (Exception e) {
-//                throw new IllegalArgumentException("Unable to parse JSON into CompletionRequest");
-//            }
+        }).exceptionHandler(error -> log.error("Could not read eb message", error));
+    }
+
+    private void establishGetActionConsumer() {
+        String address = "ut.action.get";
+
+        eb.<GetRequest>consumer(address, ebHandler -> {
+
+            getTasks(ebHandler.body()).setHandler(mHandler -> {
+                DeliveryOptions options = new DeliveryOptions().setCodecName("com.github.stephenott.usertask.DbActionResult");
+
+                if (mHandler.succeeded()) {
+                    log.info("Get Tasks command was completed");
+                    ebHandler.reply(SuccessfulAction(mHandler.result()), options);
+
+                } else {
+                    log.error("Could not complete Mongo command to Get Tasks", mHandler.cause());
+                    ebHandler.reply(FailedAction(mHandler.cause()), options);
+
+                }
+            });
 
         }).exceptionHandler(error -> log.error("Could not read eb message", error));
-
     }
 
     private Future<UserTaskEntity> completeTask(CompletionRequest completionRequest) {
@@ -99,6 +116,34 @@ public class UserTaskActionsVerticle extends AbstractVerticle {
                             promise.fail("Zero Tasks matched the find query. Possible incorrect source, job key, or task is already completed");
                             log.error("Unable to Complete the task, the findOneAndUpdate query returned 0 results: likely the find query failed to find a match.");
                         }
+                    } else {
+                        promise.fail(ar.cause());
+                    }
+                }));
+
+        return promise.future();
+    }
+
+    private Future<List<UserTaskEntity>> getTasks(GetRequest getRequest) {
+        Promise<List<UserTaskEntity>> promise = Promise.promise();
+
+        List<Bson> findQueryItems = new ArrayList<>();
+        log.info("GET REQUEST: " + getRequest.toJsonObject().toString());
+
+        getRequest.getTaskId().ifPresent(v -> findQueryItems.add(Filters.eq(v)));
+        getRequest.getState().ifPresent(v -> findQueryItems.add(Filters.eq("state", v.toString())));
+        getRequest.getTitle().ifPresent(v -> findQueryItems.add(Filters.eq("title", v)));
+        getRequest.getAssignee().ifPresent(v -> findQueryItems.add(Filters.eq("assignee", v)));
+        getRequest.getDueDate().ifPresent(v -> findQueryItems.add(Filters.eq("dueDate", v)));
+        getRequest.getBpmnProcessId().ifPresent(v -> findQueryItems.add(Filters.eq("bpmnProcessId", v)));
+        getRequest.getZeebeJobKey().ifPresent(v -> findQueryItems.add(Filters.eq("zeebeJobKey", v)));
+        getRequest.getZeebeSource().ifPresent(v -> findQueryItems.add(Filters.eq("zeebeSource", v)));
+
+        Bson queryFilter = (findQueryItems.isEmpty()) ? null : Filters.and(findQueryItems);
+
+        tasksCollection.find().filter(queryFilter).subscribe(new AsyncResultSubscriber<UserTaskEntity>().setOnCompleteHandler(ar -> {
+                    if (ar.succeeded()) {
+                        promise.complete(ar.result());
                     } else {
                         promise.fail(ar.cause());
                     }
