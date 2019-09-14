@@ -68,8 +68,6 @@ public class UserTaskHttpServerVerticle extends AbstractVerticle {
 
     private void establishCompleteActionRoute(Router router) {
         //@TODO move to common
-        String address = "ut.action.complete";
-        //@TODO move to common
         String path = "/task/complete";
 
         Route completeRoute = router.post(path)
@@ -78,8 +76,12 @@ public class UserTaskHttpServerVerticle extends AbstractVerticle {
         completeRoute.handler(rc -> {
             CompletionRequest completionRequest = rc.getBodyAsJson().mapTo(CompletionRequest.class);
 
-            DeliveryOptions options = new DeliveryOptions().setCodecName("com.github.stephenott.usertask.CompletionRequest");
 
+
+
+            //@TODO move to common
+            String address = "ut.action.complete";
+            DeliveryOptions options = new DeliveryOptions().setCodecName("com.github.stephenott.usertask.CompletionRequest");
             eb.<DbActionResult>request(address, completionRequest, options, reply -> {
                 if (reply.succeeded()) {
                     addCommonHeaders(rc.response());
