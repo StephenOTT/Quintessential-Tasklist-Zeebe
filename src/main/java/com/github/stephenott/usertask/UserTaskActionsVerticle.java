@@ -7,12 +7,11 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
-import com.mongodb.reactivestreams.client.FindPublisher;
 import com.mongodb.reactivestreams.client.MongoCollection;
-import io.vertx.core.*;
-import io.vertx.core.eventbus.DeliveryOptions;
+import io.vertx.core.AbstractVerticle;
+import io.vertx.core.Future;
+import io.vertx.core.Promise;
 import io.vertx.core.eventbus.EventBus;
-import org.bson.BsonDocument;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,7 +20,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import static com.github.stephenott.usertask.DbActionResult.*;
+import static com.github.stephenott.usertask.DbActionResult.FailedAction;
+import static com.github.stephenott.usertask.DbActionResult.SuccessfulAction;
 
 public class UserTaskActionsVerticle extends AbstractVerticle {
 
@@ -52,14 +52,13 @@ public class UserTaskActionsVerticle extends AbstractVerticle {
         eb.<CompletionRequest>consumer(address, ebHandler -> {
 
             completeTask(ebHandler.body()).setHandler(mHandler -> {
-                DeliveryOptions options = new DeliveryOptions().setCodecName("com.github.stephenott.usertask.DbActionResult");
 
                 if (mHandler.succeeded()) {
-                    ebHandler.reply(SuccessfulAction(Collections.singletonList(mHandler.result())), options);
+                    ebHandler.reply(SuccessfulAction(Collections.singletonList(mHandler.result())));
                     log.info("Document was updated with Task Completion, new doc: " + mHandler.result().toString());
 
                 } else {
-                    ebHandler.reply(FailedAction(mHandler.cause()), options);
+                    ebHandler.reply(FailedAction(mHandler.cause()));
                     log.error("Could not complete Mongo command to Update doc to COMPLETE", mHandler.cause());
                 }
             });
@@ -73,15 +72,14 @@ public class UserTaskActionsVerticle extends AbstractVerticle {
         eb.<GetRequest>consumer(address, ebHandler -> {
 
             getTasks(ebHandler.body()).setHandler(mHandler -> {
-                DeliveryOptions options = new DeliveryOptions().setCodecName("com.github.stephenott.usertask.DbActionResult");
 
                 if (mHandler.succeeded()) {
                     log.info("Get Tasks command was completed");
-                    ebHandler.reply(SuccessfulAction(mHandler.result()), options);
+                    ebHandler.reply(SuccessfulAction(mHandler.result()));
 
                 } else {
                     log.error("Could not complete Mongo command to Get Tasks", mHandler.cause());
-                    ebHandler.reply(FailedAction(mHandler.cause()), options);
+                    ebHandler.reply(FailedAction(mHandler.cause()));
 
                 }
             });

@@ -32,7 +32,7 @@ public class MyTest {
         mongodExecutable.start();
 
         try {
-            Thread.sleep(1000000);
+            Thread.sleep(2000000);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }

@@ -1,27 +1,34 @@
 package com.github.stephenott.form.validator;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.github.stephenott.conf.ApplicationConfiguration;
 import io.vertx.core.*;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.core.http.HttpServer;
 import io.vertx.core.http.HttpServerResponse;
+import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Route;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.client.WebClient;
 import io.vertx.ext.web.client.WebClientOptions;
 import io.vertx.ext.web.handler.BodyHandler;
+import io.vertx.ext.web.handler.CorsHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static com.github.stephenott.form.validator.ValidationRequestResult.*;
+import static com.github.stephenott.form.validator.ValidationRequestResult.InvalidResult;
+import static com.github.stephenott.form.validator.ValidationRequestResult.ValidResult;
 
 public class FormValidationServerHttpVerticle extends AbstractVerticle {
 
     private Logger log = LoggerFactory.getLogger(FormValidationServerHttpVerticle.class);
 
-    WebClient webClient;
+    private WebClient webClient;
 
-    EventBus eb;
+    private EventBus eb;
 
     private ApplicationConfiguration.FormValidationServerConfiguration formValidationServerConfig;
 
@@ -31,25 +38,32 @@ public class FormValidationServerHttpVerticle extends AbstractVerticle {
 
         eb = vertx.eventBus();
 
-        WebClientOptions webClientOptions = new WebClientOptions();
-        webClient = WebClient.create(vertx, webClientOptions);
+        if (formValidationServerConfig.isEnabled()) {
 
-        Router mainRouter = Router.router(vertx);
-        HttpServer server = vertx.createHttpServer();
+            WebClientOptions webClientOptions = new WebClientOptions();
+            webClient = WebClient.create(vertx, webClientOptions);
 
-        mainRouter.route().failureHandler(failure -> {
+            Router mainRouter = Router.router(vertx);
+            HttpServer server = vertx.createHttpServer();
 
-            int statusCode = failure.statusCode();
+            mainRouter.route().failureHandler(failure -> {
 
-            HttpServerResponse response = failure.response();
-            response.setStatusCode(statusCode)
-                    .end("DOG" + failure.failure().getLocalizedMessage());
-        });
+                int statusCode = failure.statusCode();
 
-        establishFormValidationRoute(mainRouter);
+                HttpServerResponse response = failure.response();
+                response.setStatusCode(statusCode)
+                        .end("DOG" + failure.failure().getLocalizedMessage());
+            });
 
-        server.requestHandler(mainRouter)
-                .listen(8082);
+            establishFormValidationRoute(mainRouter);
+
+            server.requestHandler(mainRouter)
+                    .listen(formValidationServerConfig.getPort());
+
+        }
+
+        //@TODO Add a EB config toggle
+        establishFormValidationEbConsumer();
 
         log.info("Form Validation Server deployed at: localhost:...., CORS is .... ");
     }
@@ -64,9 +78,9 @@ public class FormValidationServerHttpVerticle extends AbstractVerticle {
                 .consumes("application/json")
                 .produces("application/json");
 
-//        if (managementConfig.getCorsRegex() != null) {
-//            route.handler(CorsHandler.create(managementConfig.getCorsRegex()));
-//        }
+        if (formValidationServerConfig.getCorsRegex() != null) {
+            route.handler(CorsHandler.create(formValidationServerConfig.getCorsRegex()));
+        }
 
         route.handler(BodyHandler.create());
 
@@ -83,16 +97,16 @@ public class FormValidationServerHttpVerticle extends AbstractVerticle {
 
             validateFormSubmission(request, handler -> {
                 if (handler.succeeded()) {
-                    if (handler.result().submissionIsValid()) {
+                    if (handler.result().getResult().equals(Result.VALID)) {
                         rc.response()
                                 .setStatusCode(202)
                                 .putHeader("content-type", "application/json; charset=utf-8")
-                                .end(handler.result().toJsonObject().toBuffer());
+                                .end(JsonObject.mapFrom(handler.result().getValidResultObject()).toBuffer());
                     } else {
                         rc.response()
                                 .setStatusCode(400)
                                 .putHeader("content-type", "application/json; charset=utf-8")
-                                .end(handler.result().toJsonObject().toBuffer());
+                                .end(JsonObject.mapFrom(handler.result().getInvalidResultObject()).toBuffer());
                     }
 
                 } else {
@@ -104,10 +118,23 @@ public class FormValidationServerHttpVerticle extends AbstractVerticle {
     }
 
     private void establishFormValidationEbConsumer(){
-        //@TODO
+
+        String address = "forms.action.validate";
+
+        eb.<ValidationRequest>consumer(address, ebHandler -> {
+
+            validateFormSubmission(ebHandler.body(), valResult -> {
+                if (valResult.succeeded()){
+                    ebHandler.reply(valResult.result());
+                } else {
+                    log.error("Form Validation method failed to provide a succeeded future", valResult.cause());
+                }
+            });
+
+        }).exceptionHandler(error -> log.error("Could not read Validation Request message from EB", error));;
     }
 
-    public void validateFormSubmission(ValidationRequest validationRequest, Handler<AsyncResult<ValidationResult.Type>> handler) {
+    public void validateFormSubmission(ValidationRequest validationRequest, Handler<AsyncResult<ValidationRequestResult>> handler) {
         //@TODO Refactor this to reduce the wordiness...
         ApplicationConfiguration.FormValidatorServiceConfiguration validatorConfig = formValidationServerConfig.getFormValidatorService();
 
@@ -115,32 +142,33 @@ public class FormValidationServerHttpVerticle extends AbstractVerticle {
         int port = validatorConfig.getPort();
         long requestTimeout = validatorConfig.getRequestTimeout();
         String validateUri = validatorConfig.getValidateUri();
-        log.info("HAHAHA1");
+
+        log.info("BODY: " + JsonObject.mapFrom(new ValidationServiceRequest(validationRequest)).toString());
+
         //@TODO look at using the .expect predicate methods as part of .post() rather than using the if statusCode...
         webClient.post(port, host, validateUri)
                 .timeout(requestTimeout)
-                .sendJson(JsonObject.mapFrom(validationRequest), res -> {
+                .sendJson(new ValidationServiceRequest(validationRequest), res -> {
                     if (res.succeeded()) {
-                        log.info("HAHAHA2");
+
                         int statusCode = res.result().statusCode();
 
                         if (statusCode == 202) {
-                            ValidationResult.Valid responseValid = res.result().bodyAsJson(ValidationResult.Valid.class);
-                            handler.handle(Future.succeededFuture(responseValid));
+                            log.info("FORMIO 202 RESULT: " + res.result().bodyAsString());
+                            handler.handle(Future.succeededFuture(GenerateValidResult(res.result().bodyAsJson(ValidResult.class))));
 
                         } else if (statusCode == 400) {
-                            ValidationResult.Fail responseFail = res.result().bodyAsJson(ValidationResult.Fail.class);
-                            handler.handle(Future.succeededFuture(responseFail));
+                            log.info("FORMIO 400 RESULT: " + res.result().bodyAsString());
+                            handler.handle(Future.succeededFuture(GenerateInvalidResult(res.result().bodyAsJson(InvalidResult.class))));
 
                         } else {
-                            handler.handle(Future.failedFuture("Unexpected response returned by form validator: code:" + res.result().statusCode() + ".  Body: " + res.result().bodyAsString()));
                             log.error("Unexpected response returned by form validator: code:" + res.result().statusCode() + ".  Body: " + res.result().bodyAsString());
+                            handler.handle(Future.failedFuture("Unexpected response returned by form validator: code:" + res.result().statusCode() + ".  Body: " + res.result().bodyAsString()));
                         }
 
                     } else {
-                        log.info("HAHAHA3");
-                        handler.handle(Future.failedFuture(res.cause()));
                         log.error("Unable to complete HTTP request to validation server", res.cause());
+                        handler.handle(Future.failedFuture(res.cause()));
                     }
                 });
     }

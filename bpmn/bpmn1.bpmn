@@ -11,6 +11,7 @@
           <zeebe:header key="title" value="myTask" />
           <zeebe:header key="description" value="this is a task" />
           <zeebe:header key="assignee" value="Stephen" />
+          <zeebe:header key="formKey" value="MySimpleForm1" />
         </zeebe:taskHeaders>
       </bpmn:extensionElements>
       <bpmn:incoming>SequenceFlow_0z6yvdy</bpmn:incoming>

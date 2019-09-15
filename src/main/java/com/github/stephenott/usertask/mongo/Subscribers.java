@@ -7,6 +7,8 @@ import io.vertx.core.Handler;
 import io.vertx.core.Promise;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,6 +32,8 @@ public final class Subscribers {
         private volatile Subscription subscription;
         private volatile boolean completed;
 
+        private Logger log = LoggerFactory.getLogger(Subscribers.class);
+
         ObservableSubscriber() {
             this.received = new ArrayList<>();
             this.errors = new ArrayList<>();
@@ -49,6 +53,7 @@ public final class Subscribers {
         @Override
         public void onError(final Throwable t) {
             errors.add(t);
+            log.error("Mongo Reactive Stream Subscriber Error:", t);
             onComplete();
         }
 

@@ -4,14 +4,18 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
+import com.github.stephenott.common.EventBusable;
 import com.github.stephenott.common.EventBusableMessageCodec;
 import com.github.stephenott.conf.ApplicationConfiguration;
 import com.github.stephenott.executors.polyglot.ExecutorVerticle;
 import com.github.stephenott.executors.usertask.UserTaskExecutorVerticle;
 import com.github.stephenott.form.validator.FormValidationServerHttpVerticle;
+import com.github.stephenott.form.validator.ValidationRequest;
+import com.github.stephenott.form.validator.ValidationRequestResult;
 import com.github.stephenott.managementserver.ManagementHttpVerticle;
 import com.github.stephenott.usertask.*;
 import com.github.stephenott.usertask.mongo.MongoManager;
+import com.github.stephenott.usertask.mongo.ObjectAsStringCodec;
 import com.github.stephenott.zeebe.client.ZeebeClientVerticle;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.reactivestreams.client.MongoClients;
@@ -27,8 +31,7 @@ import org.bson.codecs.pojo.PojoCodecProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
-import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
+import static org.bson.codecs.configuration.CodecRegistries.*;
 
 public class MainVerticle extends AbstractVerticle {
 
@@ -49,9 +52,11 @@ public class MainVerticle extends AbstractVerticle {
 
         eb = vertx.eventBus();
 
-        eb.registerCodec(new EventBusableMessageCodec<>(DbActionResult.class));
-        eb.registerCodec(new EventBusableMessageCodec<>(CompletionRequest.class));
-        eb.registerCodec(new EventBusableMessageCodec<>(GetRequest.class));
+        eb.registerDefaultCodec(DbActionResult.class, new EventBusableMessageCodec<>(DbActionResult.class));
+        eb.registerDefaultCodec(CompletionRequest.class, new EventBusableMessageCodec<>(CompletionRequest.class));
+        eb.registerDefaultCodec(GetRequest.class, new EventBusableMessageCodec<>(GetRequest.class));
+        eb.registerDefaultCodec(ValidationRequest.class, new EventBusableMessageCodec<>(ValidationRequest.class));
+        eb.registerDefaultCodec(ValidationRequestResult.class, new EventBusableMessageCodec<>(ValidationRequestResult.class));
 
         String configYmlPath = config().getString("configYmlPath");
 
@@ -71,7 +76,9 @@ public class MainVerticle extends AbstractVerticle {
                         .build();
                 MongoManager.setClient(MongoClients.create(mSettings));
 
-                vertx.deployVerticle(UserTaskActionsVerticle.class, new DeploymentOptions()); //@TODO refactor this
+                //@TODO refactor this
+                vertx.deployVerticle(UserTaskActionsVerticle.class, new DeploymentOptions());
+                //@TODO refactor this
                 vertx.deployVerticle(UserTaskHttpServerVerticle.class, new DeploymentOptions());
 
                 appConfig.getExecutors().forEach(this::deployExecutorVerticle);

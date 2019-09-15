@@ -7,7 +7,6 @@ import java.util.Map;
 
 public class CompletionRequest implements EventBusable {
 
-
     @JsonProperty(value = "job", required = true)
     private long zeebeJobKey;
 
@@ -16,6 +15,10 @@ public class CompletionRequest implements EventBusable {
 
     @JsonProperty("variables")
     private Map<String, Object> completionVariables;
+
+    private boolean bypassFormSubmission = false;
+
+    private Object formSubmission;
 
 
     public CompletionRequest() {
@@ -45,6 +48,24 @@ public class CompletionRequest implements EventBusable {
 
     public CompletionRequest setCompletionVariables(Map<String, Object> completionVariables) {
         this.completionVariables = completionVariables;
+        return this;
+    }
+
+    public boolean isBypassFormSubmission() {
+        return bypassFormSubmission;
+    }
+
+    public CompletionRequest setBypassFormSubmission(boolean bypassFormSubmission) {
+        this.bypassFormSubmission = bypassFormSubmission;
+        return this;
+    }
+
+    public Object getFormSubmission() {
+        return formSubmission;
+    }
+
+    public CompletionRequest setFormSubmission(Object formSubmission) {
+        this.formSubmission = formSubmission;
         return this;
     }
 }
