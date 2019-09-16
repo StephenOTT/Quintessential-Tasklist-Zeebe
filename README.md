@@ -37,6 +37,9 @@ And then you can render and make a submission:
 ![builder4](./docs/design/form/FormBuilder4-render.png)
 
 
+Try out the builder on: https://formio.github.io/formio.js/app/builder
+
+
 ## User Task Submission with Form Data flow
 
 ![dataflow](./docs/design/form/User-Task-Form-Completion-Flow.png)
