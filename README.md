@@ -19,9 +19,33 @@ Java: `1.8`
 - Clients, Workers, and Executors can be added at startup and during runtime.
 - Failed nodes in the Vertx Cluster (Clients, Workers, and Executors) will be re-instantiated through the vertx cluster manager's configuration. 
 
+
+# Form Building UI
+
+The Form Builder UI uses Formio.js as the Builder and Render.  
+The schema that was generated from the builder is persisted and used during the User Task Submission with Form flow.
+
+![builder1](./docs/design/form/FormBuilder1-build.png)
+
+![builder2](./docs/design/form/FormBuilder2-build.png)
+
+![builder3](./docs/design/form/FormBuilder3-build.png)
+
+
+And then you can render and make a submission:
+
+![builder4](./docs/design/form/FormBuilder4-render.png)
+
+
+## User Task Submission with Form Data flow
+
+![dataflow](./docs/design/form/User-Task-Form-Completion-Flow.png)
+
+
 # ZeebeClient/Worker/Executor Data Flow
 
 ![data flow](./docs/design/dataflow.png)
+
 
 # Configuration
 
@@ -36,12 +60,17 @@ zeebe:
   clients:
     - name: MyCustomClient
       brokerContactPoint: "localhost:25600"
-      requestTimeout: PT10S
+      requestTimeout: PT20S
       workers:
-        - name: MyWorker
+        - name: SimpleScriptWorker
           jobTypes:
             - type1
+          timeout: PT10S
+        - name: UT-Worker
+          jobTypes:
             - ut.generic
+          timeout: P1D
+
 executors:
   - name: Script-Executor
     address: "type1"
@@ -67,11 +96,29 @@ managementServer:
     name: DeploymentClient
     brokerContactPoint: "localhost:25600"
     requestTimeout: PT10S
+
+formValidatorServer:
+  enabled: true
+  corsRegex: ".*."
+  port: 8082
+  instances: 1
+  formValidatorService:
+    host: localhost
+    port: 8083
+    validateUri: /validate
+    requestTimeout: 5000
+
+userTaskServer:
+  enabled: true
+  corsRegex: ".*."
+  port: 8080
+  instances: 1
 ```
 
 # Zeebe Clients
 
 A Zeebe Client is a gRPC channel to a specific Zeebe Cluster.
+
 A client maintains a set of "Job Workers", which are long polling the Zeebe Cluster for Zeebe Jobs that have a `type` listed in the `jobTypes` array.
 
 Zeebe Clients have the following configuration:
@@ -81,23 +128,33 @@ zeebe:
   clients:
     - name: MyCustomClient
       brokerContactPoint: "localhost:25600"
-      requestTimeout: PT10S
+      requestTimeout: PT20S
       workers:
-        - name: MyWorker
+        - name: SimpleScriptWorker
           jobTypes:
             - type1
+          timeout: PT10S
+        - name: UT-Worker
+          jobTypes:
             - ut.generic
+          timeout: P1D
 ``` 
 
 Where `name` is the name of the client.  The same name could be used by multiple clients in the same server or by other servers.  The `name` is used as the `zeebeSource` in Executors and User Task Executors as the source system to send completed/failed Zeebe Jobs back to.
 
 Where `workers` is a array of Zeebe Worker definitions.  A worker definition has a `name` and a list of `jobTypes`.
+
 `name` is the worker name that is provided to Zeebe as the worker that requested the job.
+
 `jobTypes` is the lsit of Zeebe job `types` that will be queried for using long polling.
 
 Jobs that are retrieved will be routed to the event bus using the address: `job.:jobType:`, where `:jobType:` is the specific Zeebe job's `type` property.
 Make sure you have executors (Polyglot, User Task or custom) on the network connected to the vertx cluster or else the job will not be consumed by a worker.
  
+ Take note of the usage of the `timeout` which is the deadline that the job will be locked for. 
+ The usage has special applicability for Jobs that you want to use with User Task; where you will want to set the timeout as a much longer period than a typical executor. 
+
+
 # Executors
 
 Executors provide a polyglot execution solution for completing Zeebe Jobs.
@@ -129,12 +186,13 @@ Where `name` is the unique name of the Executor used for logging purposes.
 
 You can deploy a Executor with multiple `instances` to provide more more parallel throughput capacity.
 
-
 Required properties: `name`, `address`, `execute`
 
-Completion of Jobs sent to Executors is captured over the event bus with the JobResult object.
+Completion of Jobs sent to Executors is captured over the event bus with the JobResult object.  
 Completed (successfully or a failure such as a business error) are sent as a JobResult to event bus address: `sourceClient.job-aciton.completion`.
+
 Where `sourceClient` is the ZeebeClient `name` that is used in the `zeebe.clients[].name` property.
+
 The `sourceClient` ensures that a completed job can be sent back to the same Zeebe Cluster, but not necessarily using the same instance of a ZeebeClient that consumed the job.
 
 JobResult's that have a `result=FAIL` will have their corresponding Zeebe Job actioned as a Failed Job.
@@ -167,11 +225,15 @@ UT Executors primary function is to provide capture of UTs from Zeebe and conver
 A UserTaskEntity is then saved in the storage of choice (such as a DB).
 
 Completion of User Tasks is captured over the event bus with the JobResult object.
+
 Completed (successfully or a failure such as a business error) are sent as a JobResult to event bus address: `sourceClient.job-aciton.completion`.
+
 Where `sourceClient` is the ZeebeClient `name` that is used in the `zeebe.clients[].name` property.
+
 The `sourceClient` ensures that a completed job can be sent back to the same Zeebe Cluster, but not necessarily using the same instance of a ZeebeClient that consumed the job.
 
 JobResult's that have a `result=FAIL` will have their corresponding Zeebe Job actioned as a Failed Job.
+
 
 ## User Tasks
 
@@ -219,7 +281,6 @@ formValidatorServer:
   corsRegex: ".*."
   port: 8082
   instances: 1
-  address: "form-validation"
   formValidatorService:
     host: localhost
     port: 8083
@@ -229,9 +290,11 @@ formValidatorServer:
 
 Where `formValidatorService` is the Form Validator service that performs the actual form validation.
 
-Where `address` is the event bus address that the Form Validator Service can be accessed from rather than through the HTTP endpoint.  Typically the event bus would be used for internal form validation calls such as for the User Task completion / Form Submission HTTP endpoint.
-
 Example Validation Request:
+
+POST: `localhost:8083/validate`
+
+Body:
 
 ```json
 {
@@ -423,14 +486,188 @@ The `bpmnProcessVersion` is optional.  You can set the version number or set as 
 }
 ```
 
-The variables will be injected into the created workflow instace.
+The variables will be injected into the created workflow instance.
 
 
-# JobResult
- 
- Add docs here
-...
+# User Task Server
 
+A User Task HTTP server that provides User Task persistence, querying, completion, etc.
+
+The server also provides a Form Schema Entity persistence, querying, and validation of submissions against the schema. 
+The Form Schema is what will be submitted to the Form Validator Service.
+
+## Server Configuration
+
+```yaml
+userTaskServer:
+  enabled: true
+  corsRegex: ".*."
+  port: 8080
+  instances: 1
+```
+
+## Actions:
+
+1. Save Form Schema
+1. Complete User Task
+1. Get User Tasks
+1. Submit Form to Complete a User Task
+1. Delete User Task (TODO)
+1. Claim User Task (TODO)
+1. UnClaim User Task (TODO)
+1. Assign User Task (TODO)
+1. Create Custom User Task (not linked to Zeebe Job)
+
+## Save Form Schema
+
+POST `/form/schema`
+
+```json
+{
+  "owner": "Department-1",
+  "key": "MySimpleForm1",
+  "title": "My Simple Form 1",
+  "schema": {
+    "display": "form",
+    "components": [
+      {
+        "label": "Text Field",
+        "allowMultipleMasks": false,
+        "showWordCount": false,
+        "showCharCount": false,
+        "tableView": true,
+        "alwaysEnabled": false,
+        "type": "textfield",
+        "input": true,
+        "key": "textField2",
+        "defaultValue": "",
+        "validate": {
+          "customMessage": "",
+          "json": "",
+          "required": true
+        },
+        "conditional": {
+          "show": "",
+          "when": "",
+          "json": ""
+        },
+        "inputFormat": "plain",
+        "encrypted": false,
+        "properties": {},
+        "customConditional": "",
+        "logic": [],
+        "attributes": {},
+        "widget": {
+          "type": ""
+        },
+        "reorder": false
+      },
+      {
+        "type": "button",
+        "label": "Submit",
+        "key": "submit",
+        "disableOnInvalid": true,
+        "theme": "primary",
+        "input": true,
+        "tableView": true
+      }
+    ],
+    "settings": {
+    }
+  }
+}
+```
+
+The `key` property is the `formKey`  value you setup in your zeebe task custom headers.
+
+Required fields: `owner`, `key`, `title`, `schema`
+
+
+## Complete User Task
+
+Mainly used as a administrative endpoint to complete a User Task without any Form
+
+POST `/task/complete`
+
+```json
+{
+  "job": 2251799813685292,
+  "source": "MyCustomClient",
+  "completionVariables": {}
+}
+```
+
+`Source` is the zeebe client name configured in your configuration yaml.
+
+
+## Get Tasks
+
+GET `/task`
+
+JSON Body:
+
+Query is run as a `AND` query on each of the arguments
+
+```json
+{
+  "taskId": "",
+  "state": "",
+  "title": "",
+  "assignee": "",
+  "dueDate": "",
+  "zeebeJobKey": "",
+  "zeebeSource": "",
+  "bpmnProcessId": ""
+}
+```
+
+You can pass `{}` as the body if you want to return all User Tasks.
+
+
+## Submit Task with Form
+
+POST `/task/id/:taskId/submit`
+
+Example: `localhost:8088/task/id/user-task--080946c6-1355-4cd7-9fcf-86fc9c46d4c4/submit`
+
+Json Body:
+
+```json
+{
+    "data": {
+        "textField2": "sog",
+        "dog": "cat"
+    },
+    "metadata": {}
+}
+```
+
+This endpoint acts the same as the Validation Server's `/validate` endpoint.  The difference is the User Task's endpoint will complete the User Task entity in the DB if the form is valid, and the Form fields will be saved in the Zeebe workflow as variables when the Job is completed.
+
+Upon successful form validation, and assuming the User Task is not already completed, then the User Task will be made complete and the completion variables will be saved. 
+Then a background worker is watching for completed user tasks and will attempt to report this back to the Zeebe Job.  
+The behaviour is this way so you can complete User Tasks without having to have a active connection to the Zeebe Cluster.
+
+## Delete User Task
+
+TODO...
+
+
+## Claim User Task
+
+TODO...
+
+## UnClaim User Task
+
+TODO...
+
+## Assign User Task
+
+TODO...
+
+## Create Custom User Task (not backed by Zeebe Job)
+
+TODO...
 
 ----
 
@@ -442,7 +679,6 @@ The variables will be injected into the created workflow instace.
 1. a JobResult is what holds the context of if a Zeebe Failure should occur in the context of the actual Work that a executor preformed.
 1. Management HTTP takes a apiRoot namespace which is the prefix for the api calls to deploy and start process instances
 1. TODO: Add a send message HTTP verticle
-1. UserTaskEntity is the DB entity
 1. UserTaskConfiguration is the data that is received from a Zeebe Custom Headers which is used to generate the Entity
 1. UserTaskVerticle is a example of a custom worker.  I have made them individual so User Tasks can be managed as stand along systems
 1. The Client Name property of the Client config is used as the EB address namespace for sending job completions back over the wire
@@ -452,7 +688,6 @@ The variables will be injected into the created workflow instace.
 1. Polling for Jobs is a executeBlocking action.  When polling is complete (found jobs or did not find jobs), it will call the poll jobs again.  It assumes long polling is enabled.
 1. TODO review defaults and setup of entity build in the user task verticle as its very messy right now.
 1. Management Server uses the route namespacing because it is assumed that security will be added by a proxy in the network.  If app level security needs to be added, then the ManagementHttpVerticle can be easily copied and replaced with security logic.
-1. TODO add User Task completion logic that adds some additional variables to the completing Job (representing the outcome of the User Task Completion)
 1. TODO move EB addresses in a global static class for easy global management
 1. TODO fix up the logging to be DEBUG and cleanup the language as the standard is all over the place at the moment.  Also inlcude more context info for when reading the log as its unclear.
 1. TODO ***** Add the defaults logic for the User Task assignments, where if the headers that are not provided in zeebe then the user tasks entity will default to those configured values.
