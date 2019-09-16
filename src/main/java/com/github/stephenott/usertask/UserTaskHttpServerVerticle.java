@@ -1,5 +1,6 @@
 package com.github.stephenott.usertask;
 
+import com.github.stephenott.conf.ApplicationConfiguration;
 import com.github.stephenott.form.validator.ValidationRequest;
 import com.github.stephenott.form.validator.ValidationRequestResult;
 import com.github.stephenott.form.validator.ValidationSchemaObject;
@@ -17,7 +18,6 @@ import io.vertx.core.Promise;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.http.HttpServer;
 import io.vertx.core.http.HttpServerResponse;
-import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Route;
@@ -37,12 +37,22 @@ public class UserTaskHttpServerVerticle extends AbstractVerticle {
 
     private EventBus eb;
 
+    private ApplicationConfiguration.UserTaskHttpServerConfiguration serverConfiguration;
+
     private MongoCollection<FormSchemaEntity> formsCollection = MongoManager.getDatabase().getCollection("forms", FormSchemaEntity.class);
     private MongoCollection<UserTaskEntity> tasksCollection = MongoManager.getDatabase().getCollection("tasks", UserTaskEntity.class);
 
+
     @Override
-    public void start() throws Exception {
-        int port = 8088;
+    public void start(Future<Void> startFuture) throws Exception {
+        try{
+            serverConfiguration = config().mapTo(ApplicationConfiguration.UserTaskHttpServerConfiguration.class);
+        } catch (Exception e){
+            log.error("Unable to start User Task HTTP Server Verticle because config cannot be parsed", e);
+            stop();
+        }
+
+        int port = serverConfiguration.getPort();
 
         log.info("Starting UserTaskHttpServerVerticle on port: {}", port);
 
@@ -58,7 +68,7 @@ public class UserTaskHttpServerVerticle extends AbstractVerticle {
             HttpServerResponse response = failure.response();
             response.setStatusCode(statusCode)
                     .putHeader("content-type", "application/json; charset=utf-8")
-                    .end("DOG-task: " + failure.failure().getLocalizedMessage());
+                    .end(failure.failure().getLocalizedMessage());
         });
 
         mainRouter.errorHandler(500, rc -> {
@@ -71,9 +81,7 @@ public class UserTaskHttpServerVerticle extends AbstractVerticle {
         establishSubmitTaskRoute(mainRouter);
         establishSaveFormSchemaRoute(mainRouter);
 
-        server.requestHandler(mainRouter)
-                .listen(port);
-
+        server.requestHandler(mainRouter).listen(port);
     }
 
     @Override
@@ -83,7 +91,7 @@ public class UserTaskHttpServerVerticle extends AbstractVerticle {
 
     private void establishSaveFormSchemaRoute(Router router){
         //@TODO move to common
-        String path = "/forms/schema";
+        String path = "/form/schema";
 
         Route saveFormSchemaRoute = router.post(path)
                 .handler(BodyHandler.create()); //@TODO add cors

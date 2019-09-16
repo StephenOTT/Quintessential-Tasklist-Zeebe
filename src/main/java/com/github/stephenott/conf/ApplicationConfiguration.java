@@ -14,6 +14,7 @@ public class ApplicationConfiguration {
     private List<UserTaskExecutorConfiguration> userTaskExecutors;
     private ManagementHttpConfiguration managementServer;
     private FormValidationServerConfiguration formValidatorServer;
+    private UserTaskHttpServerConfiguration userTaskServer;
 
     public ApplicationConfiguration() {
     }
@@ -56,6 +57,15 @@ public class ApplicationConfiguration {
 
     public ApplicationConfiguration setFormValidatorServer(FormValidationServerConfiguration formValidatorServer) {
         this.formValidatorServer = formValidatorServer;
+        return this;
+    }
+
+    public UserTaskHttpServerConfiguration getUserTaskServer() {
+        return userTaskServer;
+    }
+
+    public ApplicationConfiguration setUserTaskServer(UserTaskHttpServerConfiguration userTaskServer) {
+        this.userTaskServer = userTaskServer;
         return this;
     }
 
@@ -441,6 +451,49 @@ public class ApplicationConfiguration {
 
         public FormValidatorServiceConfiguration setRequestTimeout(long requestTimeout) {
             this.requestTimeout = requestTimeout;
+            return this;
+        }
+    }
+
+    public static class UserTaskHttpServerConfiguration {
+        private boolean enabled = true;
+        private int instances = 1;
+        private int port = 8080;
+        private String corsRegex;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public UserTaskHttpServerConfiguration setEnabled(boolean enabled) {
+            this.enabled = enabled;
+            return this;
+        }
+
+        public int getInstances() {
+            return instances;
+        }
+
+        public UserTaskHttpServerConfiguration setInstances(int instances) {
+            this.instances = instances;
+            return this;
+        }
+
+        public int getPort() {
+            return port;
+        }
+
+        public UserTaskHttpServerConfiguration setPort(int port) {
+            this.port = port;
+            return this;
+        }
+
+        public String getCorsRegex() {
+            return corsRegex;
+        }
+
+        public UserTaskHttpServerConfiguration setCorsRegex(String corsRegex) {
+            this.corsRegex = corsRegex;
             return this;
         }
     }

@@ -49,3 +49,9 @@ formValidatorServer:
     port: 8083
     validateUri: /validate
     requestTimeout: 5000
+
+userTaskServer:
+  enabled: true
+  corsRegex: ".*."
+  port: 8080
+  instances: 1
