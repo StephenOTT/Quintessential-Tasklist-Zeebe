@@ -1,168 +1,210 @@
 package com.github.stephenott.usertask.mongo;
 
-import com.mongodb.MongoTimeoutException;
 import com.mongodb.reactivestreams.client.Success;
 import io.vertx.core.AsyncResult;
+import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.Promise;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
-public final class Subscribers {
+public class Subscribers {
 
-    private Subscribers() {
-    }
-
-    /**
-     * A Subscriber that stores the publishers results and provides a latch so can block on completion.
-     *
-     * @param <T> The publishers result type
-     */
     public static class ObservableSubscriber<T> implements Subscriber<T> {
-        private final List<T> received;
-        private final List<Throwable> errors;
-        private final CountDownLatch latch;
-        private volatile Subscription subscription;
-        private volatile boolean completed;
+        private Promise<T> onNextPromise = Promise.promise();
+        private Promise<Void> onCompletePromise = Promise.promise();
+        private Promise<Subscription> onSubscribePromise = Promise.promise();
+        private Handler<AsyncResult<T>> onNextHandler;
+        private Subscription subscription;
+        private long batchSize = 5;
 
-        private Logger log = LoggerFactory.getLogger(Subscribers.class);
-
-        ObservableSubscriber() {
-            this.received = new ArrayList<>();
-            this.errors = new ArrayList<>();
-            this.latch = new CountDownLatch(1);
+        private ObservableSubscriber() {
         }
+
+        public ObservableSubscriber(Handler<AsyncResult<Subscription>> onSubscribeHandler, Handler<AsyncResult<T>> onNextHandler, Handler<AsyncResult<Void>> onCompleteHandler) {
+            this.onSubscribePromise.future().setHandler(onSubscribeHandler);
+            this.onNextHandler = onNextHandler;
+            this.onNextPromise.future().setHandler(onNextHandler);
+            this.onCompletePromise.future().setHandler(onCompleteHandler);
+        }
+
 
         @Override
         public void onSubscribe(final Subscription s) {
-            subscription = s;
-        }
-
-        @Override
-        public void onNext(final T t) {
-            received.add(t);
-        }
-
-        @Override
-        public void onError(final Throwable t) {
-            errors.add(t);
-            log.error("Mongo Reactive Stream Subscriber Error:", t);
-            onComplete();
-        }
-
-        @Override
-        public void onComplete() {
-            completed = true;
-            latch.countDown();
+            this.subscription = s;
+            this.onSubscribePromise.complete(s);
         }
 
         public Subscription getSubscription() {
             return subscription;
         }
 
-        public List<T> getReceived() {
-            return received;
-        }
-
-        public Throwable getError() {
-            if (errors.size() > 0) {
-                return errors.get(0);
-            }
-            return null;
-        }
-
-        public boolean isCompleted() {
-            return completed;
-        }
-
-        public List<T> get(final long timeout, final TimeUnit unit) throws Throwable {
-            return await(timeout, unit).getReceived();
-        }
-
-        public ObservableSubscriber<T> await() throws Throwable {
-            return await(Long.MAX_VALUE, TimeUnit.MILLISECONDS);
-        }
-
-        public ObservableSubscriber<T> await(final long timeout, final TimeUnit unit) throws Throwable {
-            subscription.request(Integer.MAX_VALUE);
-            if (!latch.await(timeout, unit)) {
-                throw new MongoTimeoutException("Publisher onComplete timed out");
-            }
-            if (!errors.isEmpty()) {
-                throw errors.get(0);
-            }
-            return this;
-        }
-    }
-
-
-    public static class AsyncResultSubscriber<T> extends ObservableSubscriber<T> {
-
-        private Promise<List<T>> onCompletePromise = Promise.promise();
-        private Promise<Void> onSubscribePromise = Promise.promise();
-        private Promise<Void> onRequestPromise = Promise.promise();
-        private boolean shouldGetAllResultsOnSubscribe = true;
-
-        public AsyncResultSubscriber() {
-        }
-
-        /**
-         * Helper for determining if the received result is a Void result or in Java Reactive Stream Mongo terms, a "Success" object.
-         * If onCompleted has not been received, then will return false.
-         * @return boolean indicating if its a Success.class result
-         */
-        public static boolean isSuccessResult(List received){
-            return received.size() == 1 &&
-                    received.get(0).getClass().isAssignableFrom(Success.class);
-        }
-
-        public AsyncResultSubscriber(Handler<AsyncResult<List<T>>> onCompleteHandler) {
-            this.onCompletePromise.future().setHandler(onCompleteHandler);
-        }
-
-        public AsyncResultSubscriber<T> setOnCompleteHandler(Handler<AsyncResult<List<T>>> handler){
-            this.onCompletePromise.future().setHandler(handler);
+        public ObservableSubscriber<T> setSubscription(Subscription subscription) {
+            this.subscription = subscription;
             return this;
         }
 
-        public AsyncResultSubscriber<T> setOnSubscribeHandler(Handler<AsyncResult<Void>> handler){
-            this.onSubscribePromise.future().setHandler(handler);
+        @Override
+        public void onNext(final T t) {
+            onNextPromise.complete(t);
+            onNextPromise = Promise.promise();
+            onNextPromise.future().setHandler(this.onNextHandler);
+        }
+
+        public ObservableSubscriber<T> onNextDo(Handler<AsyncResult<T>> handler) {
+            this.onNextHandler = handler;
             return this;
         }
 
-        public AsyncResultSubscriber<T> shouldGetAllResultsOnSubscribe(boolean shouldGetAllResultsOnSubscribe){
-            this.shouldGetAllResultsOnSubscribe = shouldGetAllResultsOnSubscribe;
-            return this;
+        @Override
+        public void onError(final Throwable t) {
+            this.onCompletePromise.fail(t);
         }
 
         @Override
         public void onComplete() {
-            super.onComplete();
-            if (getError() == null){
-                this.onCompletePromise.complete(getReceived());
-            } else {
-                this.onCompletePromise.fail(getError());
-            }
+            this.onCompletePromise.complete();
         }
 
-        @Override
-        public void onSubscribe(Subscription s) {
-            super.onSubscribe(s);
-            this.onSubscribePromise.complete();
+        public long getBatchSize() {
+            return batchSize;
+        }
 
-            if (shouldGetAllResultsOnSubscribe){
-                s.request(Integer.MAX_VALUE);
-                onRequestPromise.complete();
-            }
+        public ObservableSubscriber<T> setBatchSize(long batchSize) {
+            this.batchSize = batchSize;
+            return this;
+        }
 
+        public ObservableSubscriber<T> cancelSubscriptionPromise(Promise<Void> cancelPromise) {
+            cancelPromise.future().setHandler(action -> {
+                if (action.succeeded()) {
+                    this.subscription.cancel();
+                } else {
+                    this.subscription.cancel();
+                }
+            });
+            return this;
         }
     }
 
+    public static class SuccessSubscriber extends ObservableSubscriber<Success> {
+        List<Success> received = new ArrayList<>();
+        private ObservableSubscriber<Success> observableSubscriber;
+
+        public SuccessSubscriber(Handler<AsyncResult<Success>> resultHandler) {
+
+            observableSubscriber = new ObservableSubscriber<>(
+                    onSubscribe -> {
+                        if (onSubscribe.succeeded()) {
+                            onSubscribe.result().request(getBatchSize());
+                        } else {
+                            throw new IllegalStateException("Internal Failure: OnSubscribe promise failed.");
+                        }
+                    },
+                    onNext -> {
+                        if (onNext.succeeded()) {
+                            received.add(onNext.result());
+                        } else {
+                            throw new IllegalStateException("Internal Failure: OnNext promise failed.");
+                        }
+                    },
+                    onComplete -> {
+                        if (onComplete.succeeded()) {
+                            if (received.size() == 1) {
+                                if (received.get(0).getClass().isAssignableFrom(Success.class)) {
+                                    resultHandler.handle(Future.succeededFuture(received.get(0)));
+                                } else {
+                                    resultHandler.handle(Future.failedFuture(new IllegalStateException("Success was not returned.")));
+                                }
+                            } else {
+                                resultHandler.handle(Future.failedFuture(new IllegalStateException("More than 1 Success was returned, but was only expecting 1.")));
+                            }
+                        } else {
+                            resultHandler.handle(Future.failedFuture(onComplete.cause()));
+                        }
+                    });
+        }
+
+        public ObservableSubscriber<Success> getObservableSubscriber() {
+            return observableSubscriber;
+        }
+    }
+
+    public static class SimpleListSubscriber<T> extends ObservableSubscriber<T> {
+        private List<T> received = new ArrayList<>();
+        private ObservableSubscriber<T> observableSubscriber;
+
+        private SimpleListSubscriber() {
+        }
+
+        public SimpleListSubscriber(Handler<AsyncResult<List<T>>> resultHandler) {
+            this.observableSubscriber = new ObservableSubscriber<>(
+                    onSubscribe -> {
+                        if (onSubscribe.succeeded()) {
+                            onSubscribe.result().request(getBatchSize());
+                        } else {
+                            throw new IllegalStateException("Internal Failure: OnSubscribe promise failed.");
+                        }
+                    },
+                    onNext -> {
+                        if (onNext.succeeded()) {
+                            received.add(onNext.result());
+                            getSubscription().request(getBatchSize());
+                        } else {
+                            throw new IllegalStateException("Internal Failure: OnNext promise failed.");
+                        }
+                    },
+                    onComplete -> {
+                        if (onComplete.succeeded()) {
+                            resultHandler.handle(Future.succeededFuture(received));
+
+                        } else {
+                            resultHandler.handle(Future.failedFuture(onComplete.cause()));
+                        }
+                    });
+        }
+
+        public ObservableSubscriber<T> getObservableSubscriber() {
+            return observableSubscriber;
+        }
+    }
+
+    public static class SimpleSingleResultSubscriber<T> extends SimpleListSubscriber<T>{
+
+        public SimpleSingleResultSubscriber(Handler<AsyncResult<T>> resultHandler) {
+            super.observableSubscriber = new ObservableSubscriber<>(
+                    onSubscribe -> {
+                        if (onSubscribe.succeeded()) {
+                            System.out.println("SUBSCRIBED!!");
+                            onSubscribe.result().request(getBatchSize());
+                        } else {
+                            throw new IllegalStateException("Internal Failure: OnSubscribe promise failed.");
+                        }
+                    },
+                    onNext -> {
+                        if (onNext.succeeded()) {
+                            System.out.println("ON-NEXT!!");
+                            super.received.add(onNext.result());
+                            super.getSubscription().request(getBatchSize());
+                        } else {
+                            throw new IllegalStateException("Internal Failure: OnNext promise failed.");
+                        }
+                    },
+                    onComplete -> {
+                        if (onComplete.succeeded()) {
+                            if (super.received.size() == 1){
+                                resultHandler.handle(Future.succeededFuture(super.received.get(0)));
+                            } else {
+                                resultHandler.handle(Future.failedFuture(new IllegalStateException("More than 1 result was returned from DB, but only expected 1.")));
+                            }
+
+                        } else {
+                            resultHandler.handle(Future.failedFuture(onComplete.cause()));
+                        }
+                    });
+        }
+    }
 }

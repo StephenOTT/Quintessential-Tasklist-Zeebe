@@ -5,6 +5,7 @@ import com.github.stephenott.form.validator.ValidationRequest;
 import com.github.stephenott.form.validator.ValidationRequestResult;
 import com.github.stephenott.form.validator.ValidationSchemaObject;
 import com.github.stephenott.form.validator.ValidationSubmissionObject;
+import com.github.stephenott.usertask.DbActionResult.ActionResult;
 import com.github.stephenott.usertask.entity.FormSchemaEntity;
 import com.github.stephenott.usertask.entity.UserTaskEntity;
 import com.github.stephenott.usertask.mongo.MongoManager;
@@ -27,8 +28,11 @@ import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
+import static com.github.stephenott.usertask.DbActionResult.ActionResult.*;
 import static com.github.stephenott.usertask.UserTaskHttpServerVerticle.HttpUtils.addCommonHeaders;
 
 public class UserTaskHttpServerVerticle extends AbstractVerticle {
@@ -45,9 +49,9 @@ public class UserTaskHttpServerVerticle extends AbstractVerticle {
 
     @Override
     public void start(Future<Void> startFuture) throws Exception {
-        try{
+        try {
             serverConfiguration = config().mapTo(ApplicationConfiguration.UserTaskHttpServerConfiguration.class);
-        } catch (Exception e){
+        } catch (Exception e) {
             log.error("Unable to start User Task HTTP Server Verticle because config cannot be parsed", e);
             stop();
         }
@@ -89,7 +93,7 @@ public class UserTaskHttpServerVerticle extends AbstractVerticle {
         super.stop();
     }
 
-    private void establishSaveFormSchemaRoute(Router router){
+    private void establishSaveFormSchemaRoute(Router router) {
         //@TODO move to common
         String path = "/form/schema";
 
@@ -104,23 +108,18 @@ public class UserTaskHttpServerVerticle extends AbstractVerticle {
             Bson findQuery = Filters.eq(formSchemaEntity.getId());
 
             formsCollection.replaceOne(findQuery, formSchemaEntity, options)
-                    .subscribe(new Subscribers.AsyncResultSubscriber<>(handler -> {
-                        if (handler.succeeded()){
-                            if (handler.result().size() == 1){
-
-                                addCommonHeaders(rc.response());
-                                rc.response()
-                                        .setStatusCode(201)
-                                        .end(new JsonObject().put("id", handler.result().get(0).getUpsertedId().asString().getValue()).toBuffer());
-
-                            } else {
-                                throw new IllegalStateException("Unable to complete Form Schema Save, multiple documents were returned instead of 1.");
-                            }
-
+                    .subscribe(new Subscribers.SimpleSingleResultSubscriber<>(handler -> {
+                        if (handler.succeeded()) {
+                            addCommonHeaders(rc.response());
+                            rc.response()
+                                    .setStatusCode(201)
+                                    .end(new JsonObject()
+                                            .put("id", handler.result().getUpsertedId().asString().getValue())
+                                            .toBuffer());
                         } else {
                             throw new IllegalStateException("Unable to complete Form Schema Save");
                         }
-            }));
+                    }));
         });
     }
 
@@ -172,7 +171,7 @@ public class UserTaskHttpServerVerticle extends AbstractVerticle {
 
             eb.<DbActionResult>request(address, getRequest, reply -> {
                 if (reply.succeeded()) {
-                    if (reply.result().body().getResult().equals(DbActionResult.ActionResult.SUCCESS)) {
+                    if (reply.result().body().getResult().equals(SUCCESS)) {
                         addCommonHeaders(rc.response());
                         rc.response().end(new JsonArray(reply.result().body().getResultObject()).toBuffer());
 
@@ -189,7 +188,6 @@ public class UserTaskHttpServerVerticle extends AbstractVerticle {
         });
     }
 
-
     private void establishSubmitTaskRoute(Router router) {
         String path = "/task/id/:taskId/submit";
 
@@ -205,13 +203,14 @@ public class UserTaskHttpServerVerticle extends AbstractVerticle {
             log.info("TASK ID: " + taskId);
 
             //@TODO look at refactor with more fluent and compose
+            //@TODO DO MAJOR REFACTOR TO CLEAN THIS JUNK UP: WAY TOO DEEP of a PYRAMID
             getFormKeyFromUserTask(taskId).setHandler(taskIdHandler -> {
                 if (taskIdHandler.succeeded()) {
 
                     log.info("Found Form Key: " + taskIdHandler.result().getFormKey());
 
-                    getFormSchemaByFormKey(taskIdHandler.result().getFormKey()).setHandler( formKeyHandler -> {
-                        if (formKeyHandler.succeeded()){
+                    getFormSchemaByFormKey(taskIdHandler.result().getFormKey()).setHandler(formKeyHandler -> {
+                        if (formKeyHandler.succeeded()) {
 
                             String ebAddress = "forms.action.validate";
 
@@ -221,36 +220,74 @@ public class UserTaskHttpServerVerticle extends AbstractVerticle {
                                     .setSchema(schema)
                                     .setSubmission(submissionObject);
 
-                            eb.<ValidationRequestResult>request(ebAddress, validationRequest, ebHandler ->{
-                                if (ebHandler.succeeded()){
+                            eb.<ValidationRequestResult>request(ebAddress, validationRequest, ebHandler -> {
+                                if (ebHandler.succeeded()) {
 
-                                    if (ebHandler.result().body().getResult().equals(ValidationRequestResult.Result.VALID)){
-                                        rc.response()
-                                                .setStatusCode(202)
-                                                .putHeader("content-type", "application/json; charset=utf-8")
-                                                .end(JsonObject.mapFrom(ebHandler.result().body().getValidResultObject()).toBuffer());
+                                    if (ebHandler.result().body().getResult().equals(ValidationRequestResult.Result.VALID)) {
+
+                                        Map<String, Object> validSubmission = new HashMap<>();
+
+                                        String variableName = taskIdHandler.result().getTaskId() + "_submission";
+
+                                        validSubmission.put(variableName, ebHandler.result()
+                                                .body()
+                                                .getValidResultObject()
+                                                .getProcessedSubmission());
+
+                                        CompletionRequest completionRequest = new CompletionRequest()
+                                                .setZeebeJobKey(taskIdHandler.result().getZeebeJobKey())
+                                                .setZeebeSource(taskIdHandler.result().getZeebeSource())
+                                                .setCompletionVariables(validSubmission);
+
+                                        eb.<DbActionResult>request("ut.action.complete", completionRequest, dbCompleteHandler -> {
+                                            if (dbCompleteHandler.succeeded()) {
+                                                if (dbCompleteHandler.result().body().getResult().equals(SUCCESS)) {
+                                                    //Completion Success
+                                                    rc.response()
+                                                            .setStatusCode(202)
+                                                            .putHeader("content-type", "application/json; charset=utf-8")
+                                                            .end(JsonObject.mapFrom(ebHandler.result().body().getValidResultObject()).toBuffer());
+                                                } else {
+                                                    // DB Error returned from EB
+                                                    rc.response()
+                                                            .setStatusCode(400)
+                                                            .putHeader("content-type", "application/json; charset=utf-8")
+                                                            .end(JsonObject.mapFrom(dbCompleteHandler.result().body().getError()).toBuffer());
+                                                }
+
+                                            } else {
+                                                // EB Never returned a result for Completion
+                                                log.error("Never received a response from DB Completion request over EB");
+                                                rc.response()
+                                                        .setStatusCode(400)
+                                                        .end();
+                                            }
+                                        });
 
                                     } else {
+                                        // Form Validation was invalid: Form was invalid against the schema.
                                         rc.response()
                                                 .setStatusCode(400)
                                                 .putHeader("content-type", "application/json; charset=utf-8")
                                                 .end(JsonObject.mapFrom(ebHandler.result().body().getInvalidResultObject()).toBuffer());
                                     }
                                 } else {
+                                    // Did not receive message back on EB from Validation Service
                                     throw new IllegalStateException("Did not receive a message back from the validation service");
                                 }
-                            });
+                            }); // End of Validation Request EB send
 
                         } else {
+                            // Could not find Form Schema in DB
                             throw new IllegalArgumentException("Unable to find Form Schema for provided Form key");
                         }
-                    });
+                    }); // end of getFormSchemaByFormKey
+
                 } else {
+                    // Could not find User Task in DB for the provided TaskId
                     throw new IllegalArgumentException("Unable to find User Task for provided Task ID");
                 }
             });
-
-
         });
     }
 
@@ -267,19 +304,11 @@ public class UserTaskHttpServerVerticle extends AbstractVerticle {
         Bson findQuery = Filters.eq(taskId);
 
         tasksCollection.find().filter(findQuery)
-                .subscribe(new Subscribers.AsyncResultSubscriber<>(result -> {
+                .subscribe(new Subscribers.SimpleSingleResultSubscriber<>(result -> {
                     if (result.succeeded()) {
-
-                        if (result.result().size() == 1) {
-                            promise.complete(result.result().get(0));
-
-                        } else {
-                            log.error("DB Result returned more than 1 User Task Entity for the Task Id... something went wrong");
-                            promise.fail(new IllegalStateException("DB Result returned more than 1 User Task... something went wrong"));
-                        }
+                        promise.complete(result.result());
 
                     } else {
-                        log.error("Mongo Query did not complete for Finding User Task by ID", result.cause());
                         promise.fail(result.cause());
                     }
                 }));
@@ -297,21 +326,11 @@ public class UserTaskHttpServerVerticle extends AbstractVerticle {
         Bson findQuery = Filters.eq("key", formKey);
 
         formsCollection.find().filter(findQuery)
-                .subscribe(new Subscribers.AsyncResultSubscriber<>(result -> {
+                .subscribe(new Subscribers.SimpleSingleResultSubscriber<>(result -> {
                     if (result.succeeded()) {
-
-                        if (result.result().size() == 1) {
-                            log.info("ENTITY ID: " + result.result().get(0).getId());
-                            log.info("SCHEMA FROM ENTITY RAW: " + result.result().get(0).getSchema());
-                            promise.complete(result.result().get(0));
-
-                        } else {
-                            log.error("DB Result returned more than 1 Form Schema for the Form Key... something went wrong");
-                            promise.fail(new IllegalStateException("DB Result returned more than 1 Form Schema... something went wrong"));
-                        }
+                        promise.complete(result.result());
 
                     } else {
-                        log.error("Mongo Query did not complete for Finding Form Schema", result.cause());
                         promise.fail(result.cause());
                     }
                 }));

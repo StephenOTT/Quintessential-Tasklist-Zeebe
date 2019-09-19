@@ -77,7 +77,9 @@ public class MainVerticle extends AbstractVerticle {
                 //@TODO refactor this
                 vertx.deployVerticle(UserTaskActionsVerticle.class, new DeploymentOptions());
                 //@TODO refactor this
-                vertx.deployVerticle(UserTaskHttpServerVerticle.class, new DeploymentOptions());
+
+                deployUserTaskHttpServer(appConfig.getUserTaskServer());
+
 
                 appConfig.getExecutors().forEach(this::deployExecutorVerticle);
 
@@ -109,6 +111,20 @@ public class MainVerticle extends AbstractVerticle {
                 log.info("Management Client has successfully deployed");
             } else {
                 log.error("Management Client failed to deploy", deployResult.cause());
+            }
+        });
+    }
+
+    private void deployUserTaskHttpServer(ApplicationConfiguration.UserTaskHttpServerConfiguration config) {
+        DeploymentOptions options = new DeploymentOptions()
+                .setInstances(config.getInstances())
+                .setConfig(JsonObject.mapFrom(config));
+
+        vertx.deployVerticle(UserTaskHttpServerVerticle::new, options, deployResult -> {
+            if (deployResult.succeeded()) {
+                log.info("UserTask HTTP Server has successfully deployed");
+            } else {
+                log.error("UserTask HTTP Server failed to deploy", deployResult.cause());
             }
         });
     }

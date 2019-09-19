@@ -3,12 +3,13 @@ package com.github.stephenott.executors.usertask;
 import com.github.stephenott.common.Common;
 import com.github.stephenott.conf.ApplicationConfiguration;
 import com.github.stephenott.executors.JobResult;
-import com.github.stephenott.usertask.mongo.MongoManager;
 import com.github.stephenott.usertask.entity.UserTaskEntity;
-import com.github.stephenott.usertask.mongo.Subscribers.AsyncResultSubscriber;
+import com.github.stephenott.usertask.mongo.MongoManager;
+import com.github.stephenott.usertask.mongo.Subscribers.SuccessSubscriber;
 import com.mongodb.reactivestreams.client.MongoCollection;
-import com.mongodb.reactivestreams.client.Success;
-import io.vertx.core.*;
+import io.vertx.core.AbstractVerticle;
+import io.vertx.core.Future;
+import io.vertx.core.Promise;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
@@ -19,8 +20,6 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.UUID;
-
-import static com.github.stephenott.usertask.mongo.Subscribers.AsyncResultSubscriber.isSuccessResult;
 
 public class UserTaskExecutorVerticle extends AbstractVerticle {
 
@@ -34,9 +33,9 @@ public class UserTaskExecutorVerticle extends AbstractVerticle {
 
     @Override
     public void start() throws Exception {
-        try{
+        try {
             utExecutorConfig = config().mapTo(ApplicationConfiguration.UserTaskExecutorConfiguration.class);
-        } catch (Exception e){
+        } catch (Exception e) {
             log.error("Unable to parse Ut Executor Config", e);
             throw e;
         }
@@ -100,24 +99,11 @@ public class UserTaskExecutorVerticle extends AbstractVerticle {
         Promise<Void> promise = Promise.promise();
 
         tasksCollection.insertOne(entity)
-                .subscribe(new AsyncResultSubscriber<Success>().setOnCompleteHandler(ar -> {
-                    if (ar.succeeded()) {
-                        if (isSuccessResult(ar.result())) {
-                            promise.complete();
-
-                        } else {
-                            promise.fail(new IllegalStateException("DB did not return a Success for InsertOne."));
-                        }
+                .subscribe(new SuccessSubscriber(result -> {
+                    if (result.succeeded()) {
+                        promise.complete();
                     } else {
-                        log.error("Could not insert doc...", ar.cause());
-                        promise.fail(ar.cause());
-                    }
-
-                }).setOnSubscribeHandler(ar -> {
-                    if (ar.succeeded()) {
-                        log.info("InsertOne Subscription has been created.");
-                    } else {
-                        log.error("InsertOne Subscription failed", ar.cause());
+                        promise.fail(result.cause());
                     }
                 }));
 

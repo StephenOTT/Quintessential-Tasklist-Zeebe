@@ -1,8 +1,11 @@
 package com.github.stephenott.usertask;
 
+import com.github.stephenott.usertask.entity.FormSchemaEntity;
 import com.github.stephenott.usertask.entity.UserTaskEntity;
 import com.github.stephenott.usertask.mongo.MongoManager;
-import com.github.stephenott.usertask.mongo.Subscribers.AsyncResultSubscriber;
+import com.github.stephenott.usertask.mongo.Subscribers;
+import com.github.stephenott.usertask.mongo.Subscribers.SimpleListSubscriber;
+import com.github.stephenott.usertask.mongo.Subscribers.SimpleSingleResultSubscriber;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
@@ -12,16 +15,16 @@ import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.eventbus.EventBus;
+import io.vertx.core.json.JsonObject;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 import static com.github.stephenott.usertask.DbActionResult.FailedAction;
 import static com.github.stephenott.usertask.DbActionResult.SuccessfulAction;
+import static com.github.stephenott.usertask.mongo.MongoUtils.ensureOnlyOneResult;
 
 public class UserTaskActionsVerticle extends AbstractVerticle {
 
@@ -30,6 +33,7 @@ public class UserTaskActionsVerticle extends AbstractVerticle {
     private EventBus eb;
 
     private MongoCollection<UserTaskEntity> tasksCollection = MongoManager.getDatabase().getCollection("tasks", UserTaskEntity.class);
+    private MongoCollection<FormSchemaEntity> formsCollection = MongoManager.getDatabase().getCollection("forms", FormSchemaEntity.class);
 
     @Override
     public void start() throws Exception {
@@ -39,6 +43,7 @@ public class UserTaskActionsVerticle extends AbstractVerticle {
 
         establishCompleteActionConsumer();
         establishGetActionConsumer();
+        establishGetFormSchemaWithDefaultsForTaskIdConsumer();
     }
 
     @Override
@@ -87,6 +92,27 @@ public class UserTaskActionsVerticle extends AbstractVerticle {
         }).exceptionHandler(error -> log.error("Could not read eb message", error));
     }
 
+    private void establishGetFormSchemaWithDefaultsForTaskIdConsumer() {
+        String address = "ut.action.get-form-schema-with-defaults";
+
+        eb.<GetTasksFormSchemaReqRes.Request>consumer(address, ebHandler -> {
+
+            getFormSchemaWithDefaultsForTaskId(ebHandler.body()).setHandler(mHandler -> {
+
+                if (mHandler.succeeded()) {
+                    log.info("Get Form Schema With Defaults for Task ID completed");
+                    ebHandler.reply(SuccessfulAction(Collections.singletonList(mHandler.result())));
+
+                } else {
+                    log.error("Could not complete Get Form Schema with Defaults for Task ID", mHandler.cause());
+                    ebHandler.reply(FailedAction(mHandler.cause()));
+
+                }
+            });
+
+        }).exceptionHandler(error -> log.error("Could not read eb message", error));
+    }
+
     private Future<UserTaskEntity> completeTask(CompletionRequest completionRequest) {
         Promise<UserTaskEntity> promise = Promise.promise();
 
@@ -106,14 +132,9 @@ public class UserTaskActionsVerticle extends AbstractVerticle {
                 .returnDocument(ReturnDocument.AFTER);
 
         tasksCollection.findOneAndUpdate(findQuery, updateDoc, options)
-                .subscribe(new AsyncResultSubscriber<UserTaskEntity>().setOnCompleteHandler(ar -> {
+                .subscribe(new SimpleSingleResultSubscriber<>(ar -> {
                     if (ar.succeeded()) {
-                        if (ar.result().size() == 1) {
-                            promise.complete(ar.result().get(0));
-                        } else {
-                            promise.fail("Zero Tasks matched the find query. Possible incorrect source, job key, or task is already completed");
-                            log.error("Unable to Complete the task, the findOneAndUpdate query returned 0 results: likely the find query failed to find a match.");
-                        }
+                        promise.complete(ar.result());
                     } else {
                         promise.fail(ar.cause());
                     }
@@ -139,13 +160,59 @@ public class UserTaskActionsVerticle extends AbstractVerticle {
 
         Bson queryFilter = (findQueryItems.isEmpty()) ? null : Filters.and(findQueryItems);
 
-        tasksCollection.find().filter(queryFilter).subscribe(new AsyncResultSubscriber<UserTaskEntity>().setOnCompleteHandler(ar -> {
+        tasksCollection.find().filter(queryFilter)
+                .subscribe(new SimpleListSubscriber<>(ar -> {
                     if (ar.succeeded()) {
                         promise.complete(ar.result());
+
                     } else {
                         promise.fail(ar.cause());
                     }
                 }));
+        return promise.future();
+    }
+
+    public Future<GetTasksFormSchemaReqRes.Response> getFormSchemaWithDefaultsForTaskId(GetTasksFormSchemaReqRes.Request request) {
+        Promise<GetTasksFormSchemaReqRes.Response> promise = Promise.promise();
+
+        promise.future().compose(task -> {
+            Promise<String> stepProm = Promise.promise();
+
+            tasksCollection.find().filter(Filters.eq(request.getTaskId()))
+                    .subscribe(new SimpleSingleResultSubscriber<>(onDone -> {
+                        if (onDone.succeeded()) {
+                            stepProm.complete(onDone.result().getFormKey());
+
+                        } else {
+                            stepProm.fail(onDone.cause());
+                        }
+                    }));
+            return stepProm.future();
+
+        }).compose(formKey -> {
+            Promise<FormSchemaEntity> stepProm = Promise.promise();
+
+            formsCollection.find().filter(Filters.eq(request.getTaskId()))
+                    .subscribe(new SimpleSingleResultSubscriber<>(onDone -> {
+                        if (onDone.succeeded()) {
+                            stepProm.complete(onDone.result());
+
+                        } else {
+                            stepProm.fail(onDone.cause());
+                        }
+                    }));
+            return stepProm.future();
+
+        }).compose(formSchema -> {
+            promise.complete(
+                    new GetTasksFormSchemaReqRes.Response()
+                            .setDefaultValues(new HashMap<>())
+                            .setFormKey(formSchema.getKey())
+                            .setSchema(new JsonObject(formSchema.getSchema()).getMap())
+                            .setTaskId(request.getTaskId())
+            );
+            return Future.succeededFuture();
+        });
 
         return promise.future();
     }

@@ -53,5 +53,5 @@ formValidatorServer:
 userTaskServer:
   enabled: true
   corsRegex: ".*."
-  port: 8080
+  port: 8088
   instances: 1

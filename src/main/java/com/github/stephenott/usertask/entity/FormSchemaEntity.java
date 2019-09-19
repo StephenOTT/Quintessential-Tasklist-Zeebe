@@ -8,6 +8,7 @@ import org.bson.codecs.pojo.annotations.BsonId;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 @BsonDiscriminator
@@ -89,7 +90,7 @@ public class FormSchemaEntity {
     }
 
     @BsonIgnore
-    public FormSchemaEntity setSchema(Object schema) {
+    public FormSchemaEntity setSchema(Map<String, Object> schema) {
         this.schema = Json.encode(schema);
         return this;
     }
