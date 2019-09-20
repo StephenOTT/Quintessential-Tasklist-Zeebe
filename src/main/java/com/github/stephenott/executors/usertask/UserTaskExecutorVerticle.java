@@ -80,11 +80,11 @@ public class UserTaskExecutorVerticle extends AbstractVerticle {
             saveToDb(utEntity).setHandler(res -> {
                 if (res.succeeded()) {
                     log.info("UserTaskEntity has been saved to DB...");
-                    JobResult jobResult = new JobResult(
-                            utEntity.getZeebeJobKey(),
-                            JobResult.Result.COMPLETE, 0);
+//                    JobResult jobResult = new JobResult(
+//                            utEntity.getZeebeJobKey(),
+//                            JobResult.Result.COMPLETE, 0);
 
-                    eb.send(sourceClient + ".job-action.completion", jobResult);
+//                    eb.send(sourceClient + ".job-action.completion", jobResult);
 
                 } else {
                     //@TODO update with better error
