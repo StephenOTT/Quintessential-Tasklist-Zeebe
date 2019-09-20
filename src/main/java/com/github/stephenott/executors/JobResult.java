@@ -1,12 +1,13 @@
 package com.github.stephenott.executors;
 
+import com.github.stephenott.common.EventBusable;
 import io.vertx.core.json.JsonObject;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-public class JobResult {
+public class JobResult implements EventBusable {
 
     private Result result;
     private long jobKey;
@@ -36,52 +37,67 @@ public class JobResult {
         this(jobKey, result, null, retries, null);
     }
 
+    /**
+     * Will set retries to 0.
+     * @param jobKey
+     * @param result
+     */
+    public JobResult(long jobKey, Result result) {
+        setJobKey(jobKey);
+        setResult(result);
+    }
+
     public Result getResult() {
         return result;
     }
 
-    public void setResult(Result result) {
+    public JobResult setResult(Result result) {
         this.result = result;
+        return this;
     }
 
     public long getJobKey() {
         return jobKey;
     }
 
-    public void setJobKey(long jobKey) {
+    public JobResult setJobKey(long jobKey) {
         this.jobKey = jobKey;
+        return this;
     }
 
     public Map<String, Object> getVariables() {
         return variables;
     }
 
-    public void setVariables(Map<String, Object> variables) {
+    public JobResult setVariables(Map<String, Object> variables) {
         this.variables = variables;
+        return this;
     }
 
     public int getRetries() {
         return retries;
     }
 
-    public void setRetries(int retries) {
+    public JobResult setRetries(int retries) {
         this.retries = retries;
+        return this;
     }
 
     public String getErrorMessage() {
         return errorMessage;
     }
 
-    public void setErrorMessage(String errorMessage) {
+    public JobResult setErrorMessage(String errorMessage) {
         this.errorMessage = errorMessage;
+        return this;
     }
 
-    public JsonObject toJsonObject(){
-        return JsonObject.mapFrom(this);
-    }
-
-    public static JobResult fromJsonObject(JsonObject doneJob){
-        return doneJob.mapTo(JobResult.class);
-    }
+    //    public JsonObject toJsonObject(){
+//        return JsonObject.mapFrom(this);
+//    }
+//
+//    public static JobResult fromJsonObject(JsonObject doneJob){
+//        return doneJob.mapTo(JobResult.class);
+//    }
 
 }

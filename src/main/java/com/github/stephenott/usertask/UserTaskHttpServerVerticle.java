@@ -1,17 +1,19 @@
 package com.github.stephenott.usertask;
 
 import com.github.stephenott.conf.ApplicationConfiguration;
+import com.github.stephenott.executors.JobResult;
 import com.github.stephenott.form.validator.ValidationRequest;
 import com.github.stephenott.form.validator.ValidationRequestResult;
 import com.github.stephenott.form.validator.ValidationSchemaObject;
 import com.github.stephenott.form.validator.ValidationSubmissionObject;
-import com.github.stephenott.usertask.DbActionResult.ActionResult;
 import com.github.stephenott.usertask.entity.FormSchemaEntity;
 import com.github.stephenott.usertask.entity.UserTaskEntity;
 import com.github.stephenott.usertask.mongo.MongoManager;
 import com.github.stephenott.usertask.mongo.Subscribers;
+import com.github.stephenott.usertask.mongo.Subscribers.SimpleSubscriber;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.ReplaceOptions;
+import com.mongodb.client.result.UpdateResult;
 import com.mongodb.reactivestreams.client.MongoCollection;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
@@ -102,13 +104,13 @@ public class UserTaskHttpServerVerticle extends AbstractVerticle {
 
         saveFormSchemaRoute.handler(rc -> {
             FormSchemaEntity formSchemaEntity = rc.getBodyAsJson().mapTo(FormSchemaEntity.class);
-
+            log.info("SCHEMA: " + formSchemaEntity.getSchema());
             ReplaceOptions options = new ReplaceOptions().upsert(true);
 
             Bson findQuery = Filters.eq(formSchemaEntity.getId());
 
             formsCollection.replaceOne(findQuery, formSchemaEntity, options)
-                    .subscribe(new Subscribers.SimpleSingleResultSubscriber<>(handler -> {
+                    .subscribe(new SimpleSubscriber<UpdateResult>().singleResult(handler -> {
                         if (handler.succeeded()) {
                             addCommonHeaders(rc.response());
                             rc.response()
@@ -225,19 +227,29 @@ public class UserTaskHttpServerVerticle extends AbstractVerticle {
 
                                     if (ebHandler.result().body().getResult().equals(ValidationRequestResult.Result.VALID)) {
 
-                                        Map<String, Object> validSubmission = new HashMap<>();
+                                        Map<String, Object> completionVariables = new HashMap<>();
 
                                         String variableName = taskIdHandler.result().getTaskId() + "_submission";
 
-                                        validSubmission.put(variableName, ebHandler.result()
-                                                .body()
-                                                .getValidResultObject()
-                                                .getProcessedSubmission());
+                                        completionVariables.put(variableName, ebHandler.result()
+                                                .body().getValidResultObject().getProcessedSubmission());
 
                                         CompletionRequest completionRequest = new CompletionRequest()
                                                 .setZeebeJobKey(taskIdHandler.result().getZeebeJobKey())
                                                 .setZeebeSource(taskIdHandler.result().getZeebeSource())
-                                                .setCompletionVariables(validSubmission);
+                                                .setCompletionVariables(completionVariables);
+
+                                        //@TODO Refactor this call bck to zeebe to have a proper response handling
+                                        String zeebeSource = taskIdHandler.result().getZeebeSource();
+                                        JobResult jobResult = new JobResult(
+                                                taskIdHandler.result().getZeebeJobKey(),
+                                                JobResult.Result.COMPLETE)
+                                                .setVariables(completionVariables);
+
+                                        //Complete the job in Zeebe:
+                                        eb.send(zeebeSource + ".job-action.completion", jobResult);
+
+
 
                                         eb.<DbActionResult>request("ut.action.complete", completionRequest, dbCompleteHandler -> {
                                             if (dbCompleteHandler.succeeded()) {
@@ -279,7 +291,7 @@ public class UserTaskHttpServerVerticle extends AbstractVerticle {
 
                         } else {
                             // Could not find Form Schema in DB
-                            throw new IllegalArgumentException("Unable to find Form Schema for provided Form key");
+                            throw new IllegalArgumentException("Unable to find Form Schema for provided Form key, or multiple keys were returned.");
                         }
                     }); // end of getFormSchemaByFormKey
 
@@ -304,7 +316,7 @@ public class UserTaskHttpServerVerticle extends AbstractVerticle {
         Bson findQuery = Filters.eq(taskId);
 
         tasksCollection.find().filter(findQuery)
-                .subscribe(new Subscribers.SimpleSingleResultSubscriber<>(result -> {
+                .subscribe(new SimpleSubscriber<UserTaskEntity>().singleResult(result -> {
                     if (result.succeeded()) {
                         promise.complete(result.result());
 
@@ -326,7 +338,7 @@ public class UserTaskHttpServerVerticle extends AbstractVerticle {
         Bson findQuery = Filters.eq("key", formKey);
 
         formsCollection.find().filter(findQuery)
-                .subscribe(new Subscribers.SimpleSingleResultSubscriber<>(result -> {
+                .subscribe(new SimpleSubscriber<FormSchemaEntity>().singleResult(result -> {
                     if (result.succeeded()) {
                         promise.complete(result.result());
 

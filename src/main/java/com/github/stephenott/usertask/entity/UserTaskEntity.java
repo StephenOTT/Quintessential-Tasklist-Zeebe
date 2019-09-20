@@ -31,7 +31,7 @@ public class UserTaskEntity {
     private Instant assignedAt;
     private Instant delegatedAt;
     private Instant completedAt;
-    private Map<String, Object> variablesSubmittedOnCompletion;
+    private Map<String, Object> completeVariables;
     private String zeebeSource;
     private Instant zeebeDeadline;
     private long zeebeJobKey;
@@ -196,12 +196,12 @@ public class UserTaskEntity {
         return this;
     }
 
-    public Map<String, Object> getVariablesSubmittedOnCompletion() {
-        return variablesSubmittedOnCompletion;
+    public Map<String, Object> getCompleteVariables() {
+        return completeVariables;
     }
 
-    public UserTaskEntity setVariablesSubmittedOnCompletion(Map<String, Object> variablesSubmittedOnCompletion) {
-        this.variablesSubmittedOnCompletion = variablesSubmittedOnCompletion;
+    public UserTaskEntity setCompleteVariables(Map<String, Object> completeVariables) {
+        this.completeVariables = completeVariables;
         return this;
     }
 

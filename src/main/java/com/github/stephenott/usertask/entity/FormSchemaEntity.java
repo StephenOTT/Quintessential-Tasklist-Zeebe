@@ -1,20 +1,15 @@
 package com.github.stephenott.usertask.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import io.vertx.core.json.Json;
-import org.bson.codecs.pojo.annotations.BsonDiscriminator;
-import org.bson.codecs.pojo.annotations.BsonId;
-import org.bson.codecs.pojo.annotations.BsonIgnore;
+import com.fasterxml.jackson.annotation.JsonRawValue;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.github.stephenott.usertask.json.deserializer.JsonToStringDeserializer;
 
 import java.time.Instant;
-import java.util.Map;
 import java.util.UUID;
 
-@BsonDiscriminator
 public class FormSchemaEntity {
 
-    @BsonId
     private String Id = UUID.randomUUID().toString();
 
     private Instant createdAt = Instant.now();
@@ -30,6 +25,8 @@ public class FormSchemaEntity {
     private String description;
 
     @JsonProperty(required = true)
+    @JsonDeserialize(using = JsonToStringDeserializer.class)
+    @JsonRawValue
     private String schema;
 
     public FormSchemaEntity() {
@@ -83,15 +80,9 @@ public class FormSchemaEntity {
         return schema;
     }
 
-    @JsonIgnore
     public FormSchemaEntity setSchema(String schema) {
         this.schema = schema;
         return this;
     }
 
-    @BsonIgnore
-    public FormSchemaEntity setSchema(Map<String, Object> schema) {
-        this.schema = Json.encode(schema);
-        return this;
-    }
 }

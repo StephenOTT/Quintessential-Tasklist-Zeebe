@@ -43,7 +43,7 @@ public class ExecutorVerticle extends AbstractVerticle {
                     JobResult.Result.COMPLETE,
                     (job.getInteger("retries") > 0) ? job.getInteger("retries") - 1 : 0);
 
-            eb.send(sourceClient + ".job-action.completion", jobResult.toJsonObject());
+            eb.send(sourceClient + ".job-action.completion", jobResult);
 
         });
     }

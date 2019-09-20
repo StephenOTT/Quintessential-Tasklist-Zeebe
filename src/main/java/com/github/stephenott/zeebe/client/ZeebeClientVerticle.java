@@ -104,46 +104,60 @@ public class ZeebeClientVerticle extends AbstractVerticle {
 
 //        pollingBreaker.execute(brkCmd -> {
 
-            pollForJobs(jobType, workerName, timeout, pollResult -> {
+        pollForJobs(jobType, workerName, timeout, pollResult -> {
 
-                if (pollResult.succeeded()) {
+            if (pollResult.succeeded()) {
 //                    brkCmd.complete();
 
-                    // If no results from poll:
-                    if (pollResult.result().isEmpty()) {
+                // If no results from poll:
+                if (pollResult.result().isEmpty()) {
 //                        brkCmd.complete();
-                        log.info(workerName + " found NO Jobs for " + jobType + ", looping...");
+                    log.info(workerName + " found NO Jobs for " + jobType + ", looping...");
 
-                        createJobWorkerWithEb(jobType, workerName, Duration.parse(timeout));
+                    createJobWorkerWithEb(jobType, workerName, Duration.parse(timeout));
 
-                        //If found jobs in the results of the poll:
-                    } else {
-                        log.info(workerName + " found some Jobs for " + jobType + ", count: " + pollResult.result().size());
-
-                        //For Each Job that was returned
-                        pollResult.result().forEach(this::handleJob);
-
-                        log.info("Done handling jobs....");
-
-                        createJobWorkerWithEb(jobType, workerName, Duration.parse(timeout)); //Basically a non-blocking loop
-                    }
+                    //If found jobs in the results of the poll:
                 } else {
-                    log.error("POLLING ERROR: ---->", pollResult.cause());
-//                    brkCmd.fail(pollResult.cause());
+                    log.info(workerName + " found some Jobs for " + jobType + ", count: " + pollResult.result().size());
+
+                    //For Each Job that was returned
+                    pollResult.result().forEach(this::handleJob);
+
+                    log.info("Done handling jobs....");
+
+                    createJobWorkerWithEb(jobType, workerName, Duration.parse(timeout)); //Basically a non-blocking loop
                 }
-            }); // End of Poll
+            } else {
+                log.error("POLLING ERROR: ---->", pollResult.cause());
+//                    brkCmd.fail(pollResult.cause());
+            }
+        }); // End of Poll
 
 //        }); // End of Breaker
     }
 
     private void createJobCompletionConsumer(){
-        eb.<JsonObject>consumer(clientConfiguration.getName() + ".job-action.completion").handler(msg->{
-            JobResult jobResult = msg.body().mapTo(JobResult.class);
+        eb.<JobResult>consumer(clientConfiguration.getName() + ".job-action.completion").handler(msg->{
+//            JobResult jobResult = msg.body().mapTo(JobResult.class);
 
-            if (jobResult.getResult().equals(JobResult.Result.COMPLETE)){
-                reportJobComplete(jobResult);
+            if (msg.body().getResult().equals(JobResult.Result.COMPLETE)){
+                reportJobComplete(msg.body()).setHandler(result -> {
+                    if (result.succeeded()){
+                        log.info("Zeebe job was successfully reported to cluster as completed");
+                    } else {
+                        log.error("Unable to complete zeebe communication for reporting job success", result.cause());
+                    }
+                });
+                //@TODO Add return over EB to confirm that job was completed
             } else {
-                reportJobFail(jobResult);
+                reportJobFail(msg.body()).setHandler(result -> {
+                    if (result.succeeded()){
+                        log.info("Zeebe job was successfully reported to cluster as Job Fail");
+                    } else {
+                        log.error("Unable to complete zeebe communication for reporting job failure", result.cause());
+                    }
+                });
+                //@TODO Add return over EB to confirm that job was NOT completed
             }
         });
     }

@@ -5,8 +5,10 @@ import com.github.stephenott.conf.ApplicationConfiguration;
 import com.github.stephenott.executors.JobResult;
 import com.github.stephenott.usertask.entity.UserTaskEntity;
 import com.github.stephenott.usertask.mongo.MongoManager;
-import com.github.stephenott.usertask.mongo.Subscribers.SuccessSubscriber;
+import com.github.stephenott.usertask.mongo.Subscribers;
+import com.github.stephenott.usertask.mongo.Subscribers.SimpleSubscriber;
 import com.mongodb.reactivestreams.client.MongoCollection;
+import com.mongodb.reactivestreams.client.Success;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
@@ -82,7 +84,7 @@ public class UserTaskExecutorVerticle extends AbstractVerticle {
                             utEntity.getZeebeJobKey(),
                             JobResult.Result.COMPLETE, 0);
 
-                    eb.send(sourceClient + ".job-action.completion", jobResult.toJsonObject());
+                    eb.send(sourceClient + ".job-action.completion", jobResult);
 
                 } else {
                     //@TODO update with better error
@@ -99,7 +101,7 @@ public class UserTaskExecutorVerticle extends AbstractVerticle {
         Promise<Void> promise = Promise.promise();
 
         tasksCollection.insertOne(entity)
-                .subscribe(new SuccessSubscriber(result -> {
+                .subscribe(new SimpleSubscriber<Success>().singleResult(result -> {
                     if (result.succeeded()) {
                         promise.complete();
                     } else {

@@ -3,9 +3,7 @@ package com.github.stephenott.usertask;
 import com.github.stephenott.usertask.entity.FormSchemaEntity;
 import com.github.stephenott.usertask.entity.UserTaskEntity;
 import com.github.stephenott.usertask.mongo.MongoManager;
-import com.github.stephenott.usertask.mongo.Subscribers;
-import com.github.stephenott.usertask.mongo.Subscribers.SimpleListSubscriber;
-import com.github.stephenott.usertask.mongo.Subscribers.SimpleSingleResultSubscriber;
+import com.github.stephenott.usertask.mongo.Subscribers.SimpleSubscriber;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
@@ -16,15 +14,18 @@ import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.json.JsonObject;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
 
 import static com.github.stephenott.usertask.DbActionResult.FailedAction;
 import static com.github.stephenott.usertask.DbActionResult.SuccessfulAction;
-import static com.github.stephenott.usertask.mongo.MongoUtils.ensureOnlyOneResult;
 
 public class UserTaskActionsVerticle extends AbstractVerticle {
 
@@ -122,9 +123,12 @@ public class UserTaskActionsVerticle extends AbstractVerticle {
                 Filters.ne("state", UserTaskEntity.State.COMPLETED.toString()) // Should not be able to complete a task that is already completed
         );
 
+        Document doc = new Document();
+        doc.putAll(completionRequest.getCompletionVariables());
+
         Bson updateDoc = Updates.combine(
                 Updates.set("state", UserTaskEntity.State.COMPLETED.toString()),
-                Updates.set("completeVariables", completionRequest.getCompletionVariables()),
+                Updates.set("completeVariables", doc),
                 Updates.currentDate("completedAt")
         );
 
@@ -132,7 +136,7 @@ public class UserTaskActionsVerticle extends AbstractVerticle {
                 .returnDocument(ReturnDocument.AFTER);
 
         tasksCollection.findOneAndUpdate(findQuery, updateDoc, options)
-                .subscribe(new SimpleSingleResultSubscriber<>(ar -> {
+                .subscribe(new SimpleSubscriber<UserTaskEntity>().singleResult(ar -> {
                     if (ar.succeeded()) {
                         promise.complete(ar.result());
                     } else {
@@ -161,7 +165,7 @@ public class UserTaskActionsVerticle extends AbstractVerticle {
         Bson queryFilter = (findQueryItems.isEmpty()) ? null : Filters.and(findQueryItems);
 
         tasksCollection.find().filter(queryFilter)
-                .subscribe(new SimpleListSubscriber<>(ar -> {
+                .subscribe(new SimpleSubscriber<>(ar -> {
                     if (ar.succeeded()) {
                         promise.complete(ar.result());
 
@@ -179,12 +183,12 @@ public class UserTaskActionsVerticle extends AbstractVerticle {
             Promise<String> stepProm = Promise.promise();
 
             tasksCollection.find().filter(Filters.eq(request.getTaskId()))
-                    .subscribe(new SimpleSingleResultSubscriber<>(onDone -> {
-                        if (onDone.succeeded()) {
-                            stepProm.complete(onDone.result().getFormKey());
+                    .subscribe(new SimpleSubscriber<UserTaskEntity>().singleResult(result -> {
+                        if (result.succeeded()) {
+                            stepProm.complete(result.result().getFormKey());
 
                         } else {
-                            stepProm.fail(onDone.cause());
+                            stepProm.fail(result.cause());
                         }
                     }));
             return stepProm.future();
@@ -193,11 +197,11 @@ public class UserTaskActionsVerticle extends AbstractVerticle {
             Promise<FormSchemaEntity> stepProm = Promise.promise();
 
             formsCollection.find().filter(Filters.eq(request.getTaskId()))
-                    .subscribe(new SimpleSingleResultSubscriber<>(onDone -> {
+                    .subscribe(new SimpleSubscriber<FormSchemaEntity>().singleResult(onDone -> {
                         if (onDone.succeeded()) {
                             stepProm.complete(onDone.result());
 
-                        } else {
+//                        } else {
                             stepProm.fail(onDone.cause());
                         }
                     }));
