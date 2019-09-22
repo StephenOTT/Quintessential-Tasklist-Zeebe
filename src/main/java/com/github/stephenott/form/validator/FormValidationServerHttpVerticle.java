@@ -1,13 +1,13 @@
 package com.github.stephenott.form.validator;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.github.stephenott.conf.ApplicationConfiguration;
+import com.github.stephenott.form.validator.exception.ValidationRequestResultException;
+import com.github.stephenott.form.validator.exception.ValidationRequestResultException.ErrorType;
 import io.vertx.core.*;
 import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.core.http.HttpServer;
 import io.vertx.core.http.HttpServerResponse;
-import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Route;
 import io.vertx.ext.web.Router;
@@ -52,7 +52,7 @@ public class FormValidationServerHttpVerticle extends AbstractVerticle {
 
                 HttpServerResponse response = failure.response();
                 response.setStatusCode(statusCode)
-                        .end("DOG" + failure.failure().getLocalizedMessage());
+                        .end(new JsonObject().put("error", failure.failure().getLocalizedMessage()).toBuffer());
             });
 
             establishFormValidationRoute(mainRouter);
@@ -110,28 +110,35 @@ public class FormValidationServerHttpVerticle extends AbstractVerticle {
                     }
 
                 } else {
-                    log.error("Unable to execute validation request");
-                    rc.fail(403, handler.cause());
+                    log.error("Unable to execute validation request", handler.cause());
+                    rc.fail(500, handler.cause());
                 }
             });
         });
     }
 
-    private void establishFormValidationEbConsumer(){
+    private void establishFormValidationEbConsumer() {
 
         String address = "forms.action.validate";
 
         eb.<ValidationRequest>consumer(address, ebHandler -> {
 
             validateFormSubmission(ebHandler.body(), valResult -> {
-                if (valResult.succeeded()){
+                if (valResult.succeeded()) {
                     ebHandler.reply(valResult.result());
                 } else {
-                    log.error("Form Validation method failed to provide a succeeded future", valResult.cause());
+                    if (valResult.cause().getClass().equals(ValidationRequestResultException.class)){
+                        ValidationRequestResultException exception = (ValidationRequestResultException)valResult.cause();
+                        ebHandler.reply(GenerateErrorResult(new ErrorResult(exception.getErrorType(),exception.getMessage(), exception.getCause().getMessage())));
+
+                    } else {
+                        //@TODO refactor to rethrow a critial error for monitoring purposes.
+                        log.error("Unexpected result returned from validationFormSubmission, and thus unable to reply to " +
+                                "EB message for validation request... Something went wrong...", valResult.cause());
+                    }
                 }
             });
-
-        }).exceptionHandler(error -> log.error("Could not read Validation Request message from EB", error));;
+        }).exceptionHandler(error -> log.error("Could not read Validation Request message from EB", error));
     }
 
     public void validateFormSubmission(ValidationRequest validationRequest, Handler<AsyncResult<ValidationRequestResult>> handler) {
@@ -163,12 +170,20 @@ public class FormValidationServerHttpVerticle extends AbstractVerticle {
 
                         } else {
                             log.error("Unexpected response returned by form validator: code:" + res.result().statusCode() + ".  Body: " + res.result().bodyAsString());
-                            handler.handle(Future.failedFuture("Unexpected response returned by form validator: code:" + res.result().statusCode() + ".  Body: " + res.result().bodyAsString()));
+
+                            handler.handle(Future.failedFuture(
+                                    new ValidationRequestResultException(ErrorType.UNEXPECTED_STATUS_CODE,
+                                            "Unexpected response returned by form validator: code:" + res.result().statusCode() + ".  Body: " + res.result().bodyAsString(),
+                                            "Something went wrong with validation server.")));
                         }
 
                     } else {
                         log.error("Unable to complete HTTP request to validation server", res.cause());
-                        handler.handle(Future.failedFuture(res.cause()));
+
+                        handler.handle(Future.failedFuture(
+                                new ValidationRequestResultException(ErrorType.HTTP_REQ_FAILURE,
+                                        "Internal Message: Unable to complete HTTP request to validation server, cause: " + res.cause().getLocalizedMessage(),
+                                        "Something went wrong while trying to contact validation server.")));
                     }
                 });
     }

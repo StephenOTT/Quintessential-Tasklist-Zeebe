@@ -2,6 +2,8 @@ package com.github.stephenott.form.validator;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.github.stephenott.common.EventBusable;
+import com.github.stephenott.form.validator.exception.ValidationRequestResultException;
+import io.vertx.core.json.JsonObject;
 
 import java.util.List;
 import java.util.Map;
@@ -13,10 +15,12 @@ public class ValidationRequestResult implements EventBusable {
 
     private ValidResult validResultObject = null;
     private InvalidResult invalidResultObject = null;
+    private ErrorResult errorResult = null;
 
     public enum Result {
         VALID,
-        INVALID
+        INVALID,
+        ERROR
     }
 
     public ValidationRequestResult() {
@@ -32,6 +36,12 @@ public class ValidationRequestResult implements EventBusable {
         return new ValidationRequestResult()
                 .setResult(Result.INVALID)
                 .setInvalidResultObject(invalidResultObject);
+    }
+
+    public static ValidationRequestResult GenerateErrorResult(ErrorResult errorResult){
+        return new ValidationRequestResult()
+                .setResult(Result.ERROR)
+                .setErrorResult(errorResult);
     }
 
     public Result getResult() {
@@ -61,6 +71,14 @@ public class ValidationRequestResult implements EventBusable {
         return this;
     }
 
+    public ErrorResult getErrorResult() {
+        return errorResult;
+    }
+
+    public ValidationRequestResult setErrorResult(ErrorResult errorResult) {
+        this.errorResult = errorResult;
+        return this;
+    }
 
     public static class ValidResult {
 
@@ -140,6 +158,49 @@ public class ValidationRequestResult implements EventBusable {
 
         public InvalidResult setValidated(Map<String, Object> validated) {
             this.validated = validated;
+            return this;
+        }
+    }
+
+    public static class ErrorResult {
+
+        ValidationRequestResultException.ErrorType errorType;
+        String internalErrorMessage;
+        String endUserMessage;
+
+        private ErrorResult() {
+        }
+
+        public ErrorResult(ValidationRequestResultException.ErrorType errorType, String internalErrorMessage, String endUserMessage) {
+            this.errorType = errorType;
+            this.internalErrorMessage = internalErrorMessage;
+            this.endUserMessage = endUserMessage;
+        }
+
+        public ValidationRequestResultException.ErrorType getErrorType() {
+            return errorType;
+        }
+
+        public ErrorResult setErrorType(ValidationRequestResultException.ErrorType errorType) {
+            this.errorType = errorType;
+            return this;
+        }
+
+        public String getInternalErrorMessage() {
+            return internalErrorMessage;
+        }
+
+        public ErrorResult setInternalErrorMessage(String internalErrorMessage) {
+            this.internalErrorMessage = internalErrorMessage;
+            return this;
+        }
+
+        public String getEndUserMessage() {
+            return endUserMessage;
+        }
+
+        public ErrorResult setEndUserMessage(String endUserMessage) {
+            this.endUserMessage = endUserMessage;
             return this;
         }
     }

@@ -1,5 +1,6 @@
 package com.github.stephenott.usertask;
 
+import com.github.stephenott.usertask.DbActionResult.FailedDbActionException.FailureType;
 import com.github.stephenott.usertask.entity.FormSchemaEntity;
 import com.github.stephenott.usertask.entity.UserTaskEntity;
 import com.github.stephenott.usertask.mongo.MongoManager;
@@ -25,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 
 import static com.github.stephenott.usertask.DbActionResult.FailedAction;
+import static com.github.stephenott.usertask.DbActionResult.FailedDbActionException.FailureType.*;
 import static com.github.stephenott.usertask.DbActionResult.SuccessfulAction;
 
 public class UserTaskActionsVerticle extends AbstractVerticle {
@@ -85,7 +87,10 @@ public class UserTaskActionsVerticle extends AbstractVerticle {
 
                 } else {
                     log.error("Could not complete Mongo command to Get Tasks", mHandler.cause());
-                    ebHandler.reply(FailedAction(mHandler.cause()));
+                    ebHandler.reply(new DbActionResult.FailedDbActionException(
+                            CANT_COMPLETE_COMMAND,
+                            "Unable to complete the mongo command: " + mHandler.cause().getMessage(),
+                            "Unable to find requested task."));
 
                 }
             });
