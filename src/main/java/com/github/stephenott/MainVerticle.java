@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
-import com.github.stephenott.common.EventBusableReplyException;
 import com.github.stephenott.common.EventBusableMessageCodec;
 import com.github.stephenott.conf.ApplicationConfiguration;
 import com.github.stephenott.executors.JobResult;
@@ -52,7 +51,7 @@ public class MainVerticle extends AbstractVerticle {
 
         eb = vertx.eventBus();
 
-        eb.registerDefaultCodec(DbActionResult.FailedDbActionException.class, new EventBusableMessageCodec<>(DbActionResult.FailedDbActionException.class));
+        eb.registerDefaultCodec(FailedDbActionException.class, new EventBusableMessageCodec<>(FailedDbActionException.class));
         eb.registerDefaultCodec(JobResult.class, new EventBusableMessageCodec<>(JobResult.class));
         eb.registerDefaultCodec(DbActionResult.class, new EventBusableMessageCodec<>(DbActionResult.class));
         eb.registerDefaultCodec(CompletionRequest.class, new EventBusableMessageCodec<>(CompletionRequest.class));

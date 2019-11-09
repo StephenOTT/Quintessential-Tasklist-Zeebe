@@ -3,10 +3,14 @@ package com.github.stephenott.common;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.github.stephenott.usertask.FailedDbActionException;
 import io.vertx.core.eventbus.ReplyException;
 import io.vertx.core.eventbus.ReplyFailure;
 
-@JsonAutoDetect(fieldVisibility = Visibility.NONE, getterVisibility = Visibility.NONE, setterVisibility = Visibility.NONE, isGetterVisibility = Visibility.NONE)
+@JsonAutoDetect(fieldVisibility = Visibility.NONE,
+        getterVisibility = Visibility.NONE,
+        setterVisibility = Visibility.NONE,
+        isGetterVisibility = Visibility.NONE)
 public class EventBusableReplyException extends ReplyException implements EventBusable {
 
     @JsonProperty()
@@ -17,7 +21,11 @@ public class EventBusableReplyException extends ReplyException implements EventB
 
     @JsonProperty()
     private String userErrorMessage;
-
+//
+//    public EventBusableReplyException(FailedDbActionException.FailureType failureType, Throwable internalError, String UserErrorMessage){
+//        super(ReplyFailure.RECIPIENT_FAILURE, UserErrorMessage);
+//        this.internalErrorMessage
+//    }
 
     public EventBusableReplyException(Enum<?> failureType, String internalErrorMessage, String userErrorMessage) {
         super(ReplyFailure.RECIPIENT_FAILURE, userErrorMessage);

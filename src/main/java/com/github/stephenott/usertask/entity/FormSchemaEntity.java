@@ -4,10 +4,13 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonRawValue;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.github.stephenott.usertask.json.deserializer.JsonToStringDeserializer;
+import io.vertx.codegen.annotations.DataObject;
+import io.vertx.core.json.JsonObject;
 
 import java.time.Instant;
 import java.util.UUID;
 
+@DataObject
 public class FormSchemaEntity {
 
     private String Id = UUID.randomUUID().toString();
@@ -30,6 +33,10 @@ public class FormSchemaEntity {
     private String schema;
 
     public FormSchemaEntity() {
+    }
+
+    public FormSchemaEntity(JsonObject jsonObject){
+
     }
 
     public String getId() {

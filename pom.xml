@@ -13,10 +13,10 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
-        <vertx.version>3.8.0</vertx.version>
+        <vertx.version>3.8.1</vertx.version>
         <zeebe.version>0.21.0-alpha1</zeebe.version>
 
-        <vertx.verticle>io.test.MainVerticle</vertx.verticle>
+        <vertx.verticle>com.github.stephenott.MainVerticle</vertx.verticle>
     </properties>
 
     <dependencyManagement>
@@ -112,6 +112,18 @@
             <scope>test</scope>
         </dependency>
 
+        <dependency>
+            <groupId>io.vertx</groupId>
+            <artifactId>vertx-codegen</artifactId>
+            <classifier>processor</classifier>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.vertx</groupId>
+            <artifactId>vertx-service-proxy</artifactId>
+        </dependency>
+
+
     </dependencies>
 
 
@@ -126,7 +138,6 @@
                     <target>1.8</target>
                 </configuration>
             </plugin>
-
         </plugins>
     </build>
 </project>

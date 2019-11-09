@@ -1,14 +1,12 @@
 package com.github.stephenott.usertask;
 
-import com.github.stephenott.usertask.DbActionResult.FailedDbActionException.FailureType;
+import com.github.stephenott.usertask.FailedDbActionException.FailureType;
 import com.github.stephenott.usertask.entity.FormSchemaEntity;
 import com.github.stephenott.usertask.entity.UserTaskEntity;
 import com.github.stephenott.usertask.mongo.MongoManager;
 import com.github.stephenott.usertask.mongo.Subscribers.SimpleSubscriber;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.FindOneAndUpdateOptions;
-import com.mongodb.client.model.ReturnDocument;
-import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.*;
+import com.mongodb.client.result.UpdateResult;
 import com.mongodb.reactivestreams.client.MongoCollection;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
@@ -21,13 +19,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-
-import static com.github.stephenott.usertask.DbActionResult.FailedAction;
-import static com.github.stephenott.usertask.DbActionResult.FailedDbActionException.FailureType.*;
-import static com.github.stephenott.usertask.DbActionResult.SuccessfulAction;
 
 public class UserTaskActionsVerticle extends AbstractVerticle {
 
@@ -62,11 +55,11 @@ public class UserTaskActionsVerticle extends AbstractVerticle {
             completeTask(ebHandler.body()).setHandler(mHandler -> {
 
                 if (mHandler.succeeded()) {
-                    ebHandler.reply(SuccessfulAction(Collections.singletonList(mHandler.result())));
+                    ebHandler.reply(mHandler.result());
                     log.info("Document was updated with Task Completion, new doc: " + mHandler.result().toString());
 
                 } else {
-                    ebHandler.reply(FailedAction(mHandler.cause()));
+                    ebHandler.reply(new FailedDbActionException(FailureType.CANT_COMPLETE_COMMAND, "", ""));
                     log.error("Could not complete Mongo command to Update doc to COMPLETE", mHandler.cause());
                 }
             });
@@ -83,18 +76,16 @@ public class UserTaskActionsVerticle extends AbstractVerticle {
 
                 if (mHandler.succeeded()) {
                     log.info("Get Tasks command was completed");
-                    ebHandler.reply(SuccessfulAction(mHandler.result()));
+                    ebHandler.reply(mHandler.result());
 
                 } else {
                     log.error("Could not complete Mongo command to Get Tasks", mHandler.cause());
-                    ebHandler.reply(new DbActionResult.FailedDbActionException(
-                            CANT_COMPLETE_COMMAND,
+                    ebHandler.reply(new FailedDbActionException(
+                            FailureType.CANT_COMPLETE_COMMAND,
                             "Unable to complete the mongo command: " + mHandler.cause().getMessage(),
-                            "Unable to find requested task."));
-
+                            "Unable to process the request"));
                 }
             });
-
         }).exceptionHandler(error -> log.error("Could not read eb message", error));
     }
 
@@ -107,11 +98,11 @@ public class UserTaskActionsVerticle extends AbstractVerticle {
 
                 if (mHandler.succeeded()) {
                     log.info("Get Form Schema With Defaults for Task ID completed");
-                    ebHandler.reply(SuccessfulAction(Collections.singletonList(mHandler.result())));
+                    ebHandler.reply(new DbActionResult(mHandler.result()));
 
                 } else {
                     log.error("Could not complete Get Form Schema with Defaults for Task ID", mHandler.cause());
-                    ebHandler.reply(FailedAction(mHandler.cause()));
+                    ebHandler.reply(new FailedDbActionException(FailureType.CANT_COMPLETE_COMMAND, "", ""));
 
                 }
             });
@@ -222,6 +213,25 @@ public class UserTaskActionsVerticle extends AbstractVerticle {
             );
             return Future.succeededFuture();
         });
+
+        return promise.future();
+    }
+
+    public Future<DbActionResult> saveFormSchema(FormSchemaEntity formSchemaEntity){
+        Promise<DbActionResult> promise = Promise.promise();
+
+        ReplaceOptions options = new ReplaceOptions().upsert(true);
+
+        Bson filter = Filters.eq("key", formSchemaEntity.getKey());
+
+        formsCollection.replaceOne(filter, formSchemaEntity, options)
+                .subscribe(new SimpleSubscriber<UpdateResult>().singleResult(handler -> {
+                    if (handler.succeeded()) {
+                        promise.complete(new DbActionResult(handler.result()));
+                    } else {
+                        promise.fail(new FailedDbActionException(FailureType.CANT_CREATE, "",""));
+                    }
+                }));
 
         return promise.future();
     }
