@@ -4,5 +4,28 @@ micronaut:
   http:
     client:
       read-timeout: 5s
+datasources:
+  default:
+    url: jdbc:h2:mem:devDb
+    driverClassName: org.h2.Driver
+    username: sa
+    password: ''
+    dialect: H2
+
+jpa:
+  default:
+    packages-to-scan:
+      - 'com.github.stephenott.qtz.forms.persistence'
+    properties:
+      hibernate:
+        hbm2ddl:
+          auto: create-drop
+        show_sql: true
+flyway:
+  datasources:
+    default:
+      locations: classpath:databasemigrations
+
+
 formValidatorService:
   host: http://localhost:8081

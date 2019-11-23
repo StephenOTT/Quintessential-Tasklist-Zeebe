@@ -1,5 +1,6 @@
 package com.github.stephenott.qtz.forms.validator
 
+import com.github.stephenott.qtz.forms.FormSchema
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Body

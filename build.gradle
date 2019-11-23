@@ -41,6 +41,15 @@ dependencies {
     testImplementation "io.micronaut.test:micronaut-test-kotlintest"
     testImplementation "io.mockk:mockk:1.9.3"
     testImplementation "io.kotlintest:kotlintest-runner-junit5:3.3.2"
+
+    kapt 'io.micronaut.data:micronaut-data-processor:1.0.0.M5'
+    implementation 'io.micronaut.data:micronaut-data-hibernate-jpa:1.0.0.M5'
+    runtime 'com.h2database:h2'
+    runtime 'io.micronaut.configuration:micronaut-jdbc-hikari'
+    implementation 'io.micronaut.configuration:micronaut-flyway'
+
+
+
 }
 
 test.classpath += configurations.developmentOnly
