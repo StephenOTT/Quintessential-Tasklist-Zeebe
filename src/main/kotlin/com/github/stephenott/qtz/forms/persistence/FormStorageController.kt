@@ -1,62 +1,62 @@
 package com.github.stephenott.qtz.forms.persistence
 
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.data.model.Pageable
 import io.micronaut.http.HttpResponse
-import io.micronaut.http.annotation.Body
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.*
 import io.micronaut.validation.Validated
 import io.reactivex.Single
-import javax.inject.Inject
+import java.util.*
+import javax.annotation.Nullable
+import javax.validation.Valid
+import javax.validation.constraints.Pattern
+import javax.validation.constraints.Positive
+import javax.validation.constraints.PositiveOrZero
 
 
-data class FormSaveModel(
+data class FormSaveRequest(
         val name: String,
         val description: String? = null,
         val formKey: String
-){
-    fun toForm():Form {
-        return Form(name = name, description = description, formKey = formKey)
+) {
+    fun toFormEntity(): FormEntity {
+        return FormEntity(name = name, description = description, formKey = formKey)
     }
 }
 
 @Controller("/forms")
-open class FormStorageController() : FormStorageOperations {
+open class FormStorageController(val formRepository: FormRepository) : FormStorageOperations {
 
-    @Inject
-    lateinit var formRepository: FormRepository
-
-    @Post("/save")
-    override fun saveForm(@Body form: Single<FormSaveModel>): Single<HttpResponse<Form>> {
-        return form.flatMap {
-            formRepository.persist(it.toForm())
-        }.map {
-            HttpResponse.ok(it)
-        }
+    @Post()
+    override fun saveForm(@Body form: Single<FormSaveRequest>): Single<HttpResponse<FormEntity>> {
+        return form.flatMapPublisher {
+            formRepository.save(it.toFormEntity())
+        }.singleOrError().map { HttpResponse.ok(it) }
     }
 
+    @Get("{?formId}{?formKey}{?pageable*}")
+    override fun getForm(formId: UUID?, formKey: String?, pageable: Pageable?): Single<HttpResponse<List<FormEntity>>> {
+        formId?.let { uuid ->
+            return Single.fromPublisher(formRepository.findById(uuid))
+                    .map { HttpResponse.ok(listOf(it)) }
+        }
+        formKey?.let { key ->
+            return formRepository.findByFormKey(key).map { HttpResponse.ok(listOf(it)) }
+        }
+        return formRepository.findAll(pageable ?: Pageable.from(0, 100))
+                .map {
+                    HttpResponse.ok(it.content)
+                            //@TODO Add headers function helper to set common list headers
+                            //@TODO Add .next() support
+                            .header("X-Total-Count", it.totalSize.toString())
+                            .header("X-Page-Count", it.numberOfElements.toString())
+                }
+    }
 }
 
 @Validated
 interface FormStorageOperations {
-    fun saveForm(@Body form: Single<FormSaveModel>): Single<HttpResponse<Form>>
+    fun saveForm(form: Single<FormSaveRequest>): Single<HttpResponse<FormEntity>>
 
-//    fun saveFormSchema(formUuid: String, @Body form: Single<Schema>): Single<HttpResponse<Unit>>
-//
-//    fun updateForm(@Body form: Single<Form>): Single<HttpResponse<Form>>
-//
-//    fun updateFormSchema(formUuid: String, @Body form: Single<Schema>): Single<HttpResponse<Unit>>
-//
-//    fun deleteFormAndAllRelatedSchemas(formUuid: String): Single<HttpResponse<Unit>>
-//
-//    fun deleteFormSchema(formUuid: String): Single<HttpResponse<Unit>>
-//
-//    /**
-//     * Defaults to latest schema version (higher version number)
-//     */
-//    fun getFormWithSchema(schemaVersion: Long?): Single<HttpResponse<Form>>
-//
-//    fun getForms(): Single<HttpResponse<List<Form>>>
-//
-//    fun getFormSchemas(formUuid: String, schemaVersion: Long): Single<HttpResponse<List<Schema>>>
-
+    fun getForm(formId: UUID?, formKey: String?, pageable: Pageable?): Single<HttpResponse<List<FormEntity>>>
 }
