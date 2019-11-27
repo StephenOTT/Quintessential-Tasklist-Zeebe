@@ -1,60 +1,83 @@
 package com.github.stephenott.qtz.forms.persistence
 
+import com.fasterxml.jackson.annotation.JsonIgnore
+import com.fasterxml.jackson.annotation.JsonUnwrapped
 import com.github.stephenott.qtz.forms.FormSchema
-import io.micronaut.data.annotation.*
-
-import io.micronaut.data.model.DataType
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.data.annotation.DateCreated
+import io.micronaut.data.annotation.DateUpdated
+import io.micronaut.data.annotation.Join
+import io.micronaut.data.annotation.Repository
+import io.micronaut.data.jpa.annotation.EntityGraph
 import io.micronaut.data.model.Page
 import io.micronaut.data.model.Pageable
 import io.micronaut.data.repository.reactive.ReactiveStreamsCrudRepository
-import io.micronaut.http.HttpResponse
 import io.reactivex.Single
+import org.reactivestreams.Publisher
 import java.time.Instant
 import java.util.*
-import javax.persistence.Entity
-import javax.persistence.Id
+import javax.persistence.*
 
 
 @Repository
 interface FormRepository : ReactiveStreamsCrudRepository<FormEntity, UUID> {
-    fun findByFormKey(formKey: String): Single<FormEntity>
-    fun findAll(pageable: Pageable): Single<Page<FormEntity>>
 
+    fun findByFormKey(formKey: String): Single<FormEntity>
+
+    fun findAll(pageable: Pageable): Single<Page<FormEntity>>
 }
+
+@Repository
+interface FormSchemaRepository : ReactiveStreamsCrudRepository<FormSchemaEntity, UUID> {
+
+    fun findByForm(form: FormEntity, pageable: Pageable): Single<Page<FormSchemaEntity>>
+}
+
+//@Introspected
+//data class SchemaDTO(var schema: FormSchema? = null)
+
 
 @Entity
 data class FormEntity(
-        @Id
-//        @AutoPopulated // @TODO Does not currently work...
-        var uuid: UUID? = UUID.randomUUID(),
 
-        @DateCreated
+        @field:Id
+        var id: UUID? = UUID.randomUUID(),
+
+        @field:DateCreated
         var createdAt: Instant? = null,
 
-        @DateUpdated
+        @field:DateUpdated
         var updatedAt: Instant? = null,
 
-        var name: String,
+        var name: String? = null,
+
         var description: String? = null,
-        var formKey: String
+
+        var formKey: String? = null,
+
+        @field:OneToMany(mappedBy = "form", fetch = FetchType.LAZY, cascade = [CascadeType.ALL])
+        @get:JsonIgnore
+        var schemas: Set<FormSchemaEntity>? = null
 )
 
-data class Schema(
-        @Id
-        @AutoPopulated
-        val uuid: UUID,
+@Entity
+data class FormSchemaEntity(
 
-        @Relation(value = Relation.Kind.ONE_TO_ONE)
-        val form: FormEntity,
+        @field:Id
+        var id: UUID? = UUID.randomUUID(),
 
-        @DateCreated
-        val createdAt: Instant,
+        @field:DateCreated
+        var createdAt: Instant? = null,
 
-        @DateUpdated
-        val updatedAt: Instant,
+        @field:DateUpdated
+        var updatedAt: Instant? = null,
 
-        val version: Long,
+        var version: Long? = null,
 
-        @TypeDef(type = DataType.JSON)
-        val schema: FormSchema
+        @field:ManyToOne(fetch = FetchType.EAGER, optional = false)
+        var form: FormEntity? = null,
+
+        @field:Column(columnDefinition = "JSON")
+        @field:Convert(converter = FormSchemaAttributeConverter::class)
+        var schema: FormSchema? = null
 )
