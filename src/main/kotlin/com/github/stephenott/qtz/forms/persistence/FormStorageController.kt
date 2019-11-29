@@ -9,7 +9,6 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.validation.Validated
-import io.reactivex.Flowable
 import io.reactivex.Single
 import java.util.*
 import javax.inject.Inject
@@ -82,15 +81,17 @@ class FormStorageController() : FormStorageOperations {
     }
 
     @Get("/{formId}/schemas")
-    override fun getSchemasByFormId(formId: UUID, pageable: Pageable?): Single<HttpResponse<List<FormSchema>>> {
+    override fun getSchemasByFormId(formId: UUID, pageable: Pageable?): Single<HttpResponse<List<FormSchemaEntity>>> {
+        //@TODO Refactor to make pageable a configurable option
         return formSchemaRepository.findByForm(
                 FormEntity(id = formId),
-                pageable ?: Pageable.from(0, 10, Sort.of(Sort.Order.desc("version")))) //@TODO Refactor to a configurable default
-                .map { page ->
-                    HttpResponse.ok(page.content.map { it.schema!! }) //@TODO Refactor to use projections on DB level
-                            .header("X-Total-Count", page.totalSize.toString())
-                            .header("X-Page-Count", page.numberOfElements.toString())
-                }
+                pageable
+                        ?: Pageable.from(0, 10, Sort.of(Sort.Order.desc("version")))
+        ).map { page ->
+            HttpResponse.ok(page.content) //@TODO Refactor to use projections on DB level
+                    .header("X-Total-Count", page.totalSize.toString())
+                    .header("X-Page-Count", page.numberOfElements.toString())
+        }
     }
 }
 
@@ -102,5 +103,5 @@ interface FormStorageOperations {
 
     fun addSchema(formId: UUID, schema: Single<FormSchemaSaveRequest>): Single<HttpResponse<FormSchemaEntity>>
 
-    fun getSchemasByFormId(formId: UUID, pageable: Pageable?): Single<HttpResponse<List<FormSchema>>>
+    fun getSchemasByFormId(formId: UUID, pageable: Pageable?): Single<HttpResponse<List<FormSchemaEntity>>>
 }

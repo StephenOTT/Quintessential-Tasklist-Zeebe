@@ -13,7 +13,7 @@ import io.reactivex.Single
 
 
 @Controller("/forms")
-open class FormSubmissionController(private val formValidatorServiceClient: FormValidatorServiceClient) : FormSubmissionOperations {
+class FormSubmissionController(private val formValidatorServiceClient: FormValidatorServiceClient) : FormSubmissionOperations {
 
     @Post(value = "/submit")
     override fun submit(submission: Single<FormSubmission>): Single<HttpResponse<FormSubmission>> {

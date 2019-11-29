@@ -14,7 +14,8 @@ datasources:
 jpa:
   default:
     packages-to-scan:
-      - 'com.github.stephenott.qtz.forms.persistence'
+      - 'com.github.stephenott.qtz.forms'
+      - 'com.github.stephenott.qtz.tasks'
     properties:
       hibernate:
         hbm2ddl:

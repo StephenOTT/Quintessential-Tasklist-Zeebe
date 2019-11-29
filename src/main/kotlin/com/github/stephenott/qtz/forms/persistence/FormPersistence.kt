@@ -1,19 +1,14 @@
 package com.github.stephenott.qtz.forms.persistence
 
 import com.fasterxml.jackson.annotation.JsonIgnore
-import com.fasterxml.jackson.annotation.JsonUnwrapped
 import com.github.stephenott.qtz.forms.FormSchema
-import io.micronaut.core.annotation.Introspected
 import io.micronaut.data.annotation.DateCreated
 import io.micronaut.data.annotation.DateUpdated
-import io.micronaut.data.annotation.Join
 import io.micronaut.data.annotation.Repository
-import io.micronaut.data.jpa.annotation.EntityGraph
 import io.micronaut.data.model.Page
 import io.micronaut.data.model.Pageable
 import io.micronaut.data.repository.reactive.ReactiveStreamsCrudRepository
 import io.reactivex.Single
-import org.reactivestreams.Publisher
 import java.time.Instant
 import java.util.*
 import javax.persistence.*
@@ -75,6 +70,7 @@ data class FormSchemaEntity(
         var version: Long? = null,
 
         @field:ManyToOne(fetch = FetchType.EAGER, optional = false)
+        @field:JsonIgnore
         var form: FormEntity? = null,
 
         @field:Column(columnDefinition = "JSON")
