@@ -1,6 +1,5 @@
 package com.github.stephenott.qtz.tasks.domain
 
-import io.micronaut.data.annotation.DateCreated
 import io.micronaut.data.annotation.DateUpdated
 import java.time.Instant
 import java.util.*
@@ -14,15 +13,13 @@ data class UserTaskEntity(
         @field:GeneratedValue
         var taskId: UUID? = null,
 
+        @field:Version
         var olVersion: Long? = null,
-
-        @field:DateCreated
-        var createdAt: Instant? = null,
 
         @field:DateUpdated
         var updatedAt: Instant? = null,
 
-        var takOriginalCapture: Instant? = null,
+        var taskOriginalCapture: Instant? = null,
 
         var state: UserTaskState? = null,
 
@@ -45,12 +42,10 @@ data class UserTaskEntity(
 
         var formKey: String? = null,
 
-        var assignedAt: Instant? = null,
-
         var completedAt: Instant? = null,
 
         @field:Column(columnDefinition = "JSON")
-        @field:Convert(converter = ZeebeVariables::class)
+        @field:Convert(converter = ZeebeVariablesAttributeConverter::class)
         var completeVariables: ZeebeVariables? = null,
 
         var zeebeSource: String? = null,
@@ -62,7 +57,7 @@ data class UserTaskEntity(
         var bpmnProcessVersion: Long?  = null,
 
         @field:Column(columnDefinition = "JSON")
-        @field:Convert(converter = ZeebeVariables::class)
+        @field:Convert(converter = ZeebeVariablesAttributeConverter::class)
         var zeebeVariablesAtCapture: ZeebeVariables? = null,
 
         @field:Column(columnDefinition = "JSON")
@@ -70,8 +65,10 @@ data class UserTaskEntity(
         var metadata: UserTaskMetadata? = null
 )
 
+//@TODO Create History table that tracks changes to tasks such as claim, unclaim, assign, priority changes, etc.
+
 enum class UserTaskState {
-    NEW, ASSIGNED, UNASSIGNED, DELEGATED, COMPLETED
+    NEW, ASSIGNED, UNASSIGNED, COMPLETED
 }
 
 data class ZeebeVariables(val variables: Map<String, Any?>? = null)

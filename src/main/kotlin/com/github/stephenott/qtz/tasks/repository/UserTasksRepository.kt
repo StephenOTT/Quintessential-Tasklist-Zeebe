@@ -5,13 +5,13 @@ import com.github.stephenott.qtz.tasks.domain.UserTaskState
 import io.micronaut.data.annotation.Repository
 import io.micronaut.data.model.Page
 import io.micronaut.data.model.Pageable
-import io.micronaut.data.repository.reactive.ReactiveStreamsCrudRepository
+import io.micronaut.data.repository.reactive.RxJavaCrudRepository
 import io.reactivex.Single
 import java.util.*
 
 @Repository
-interface UserTasksRepository: ReactiveStreamsCrudRepository<UserTaskEntity, UUID>{
-
+interface UserTasksRepository: RxJavaCrudRepository<UserTaskEntity, UUID>{
+    fun update(entity: UserTaskEntity): Single<UserTaskEntity>
     fun findAll(pageable: Pageable): Single<Page<UserTaskEntity>>
     fun findByStateInList(state: List<UserTaskState>?, pageable: Pageable): Single<Page<UserTaskEntity>>
     fun findByAssigneeAndStateInList(assignee: String?, state: List<UserTaskState>?, pageable: Pageable): Single<Page<UserTaskEntity>>
