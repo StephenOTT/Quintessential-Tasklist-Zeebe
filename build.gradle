@@ -49,7 +49,9 @@ dependencies {
     runtime 'io.micronaut.configuration:micronaut-jdbc-hikari'
     implementation 'io.micronaut.configuration:micronaut-flyway'
 
-
+    implementation "io.zeebe:zeebe-client-java:$zeebeVersion"
+//    testImplementation "io.zeebe:zeebe-test:$zeebeVersion"
+    testImplementation "io.zeebe:zeebe-test-container:$zeebeVersion"
 
 }
 
