@@ -4,6 +4,7 @@ micronaut:
   http:
     client:
       read-timeout: 5s
+
 datasources:
   default:
     url: jdbc:h2:./build/DB/dbdevDb1 # jdbc:h2:~/devDb1;MODE=PostgreSQL;AUTO_SERVER=TRUE
@@ -11,6 +12,7 @@ datasources:
     username: sa
     password: sa
     dialect: H2 # POSTGRES
+
 jpa:
   default:
     packages-to-scan:
@@ -21,10 +23,17 @@ jpa:
         hbm2ddl:
           auto: create-drop
         show_sql: true
+
 flyway:
   datasources:
     default:
       locations: classpath:databasemigrations
 
+
 formValidatorService:
   host: http://localhost:8081
+
+zeebe:
+  management:
+    client:
+      brokerContactPoint:
