@@ -36,4 +36,4 @@ formValidatorService:
 zeebe:
   management:
     client:
-      brokerContactPoint:
+      broker: "localhost:26500"

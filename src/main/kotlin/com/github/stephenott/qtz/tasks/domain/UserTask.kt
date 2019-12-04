@@ -52,9 +52,19 @@ data class UserTaskEntity(
 
         var zeebeJobKey: Long? = null,
 
-        var bpmnProcessId: String?  = null,
+        var zeebeBpmnProcessId: String?  = null,
 
-        var bpmnProcessVersion: Long?  = null,
+        var zeebeBpmnProcessKey: Long?  = null,
+
+        var zeebeElementInstanceKey: Long?  = null,
+
+        var zeebeElementId: String?  = null,
+
+        var zeebeBpmnProcessVersion: Int?  = null,
+
+        var zeebeJobRetriesRemaining: Int? = null,
+
+        var zeebeJobDealine: Instant? = null,
 
         @field:Column(columnDefinition = "JSON")
         @field:Convert(converter = ZeebeVariablesAttributeConverter::class)

@@ -47,8 +47,8 @@ open class UserTasksController() : UserTasksOperations {
                 completeVariables = ZeebeVariables(mapOf(Pair("DOG", 1234))),
                 zeebeSource = "some-source-zeebe",
                 zeebeJobKey = 3432432432432432,
-                bpmnProcessId = "some-p-id-43423",
-                bpmnProcessVersion = 222,
+                zeebeBpmnProcessId = "some-p-id-43423",
+                zeebeBpmnProcessVersion = 222,
                 zeebeVariablesAtCapture = ZeebeVariables(mapOf(Pair("CAR", 1234))),
                 metadata = UserTaskMetadata(mapOf(Pair("CAR", 1234)))
         )
