@@ -8,8 +8,6 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.test.annotation.MicronautTest
 import io.zeebe.client.ZeebeClient
-import io.zeebe.containers.ZeebePort
-import io.zeebe.containers.broker.ZeebeBrokerContainer
 import java.io.File
 import java.io.FileWriter
 
