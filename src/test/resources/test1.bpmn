@@ -4,18 +4,30 @@
     <bpmn:startEvent id="StartEvent_1">
       <bpmn:outgoing>SequenceFlow_1hnbx9h</bpmn:outgoing>
     </bpmn:startEvent>
-    <bpmn:serviceTask id="ServiceTask_1luzsfd" name="test1Name">
+    <bpmn:serviceTask id="ServiceTask_1luzsfd" name="Task 1">
       <bpmn:extensionElements>
-        <zeebe:taskDefinition type="testType" />
+        <zeebe:taskDefinition type="user-task" />
+        <zeebe:taskHeaders>
+          <zeebe:header key="title" value="My Custom Task" />
+          <zeebe:header key="formKey" value="some-form-key-123" />
+        </zeebe:taskHeaders>
       </bpmn:extensionElements>
       <bpmn:incoming>SequenceFlow_1hnbx9h</bpmn:incoming>
       <bpmn:outgoing>SequenceFlow_0m879d8</bpmn:outgoing>
     </bpmn:serviceTask>
     <bpmn:sequenceFlow id="SequenceFlow_1hnbx9h" sourceRef="StartEvent_1" targetRef="ServiceTask_1luzsfd" />
     <bpmn:endEvent id="EndEvent_110wsp7">
-      <bpmn:incoming>SequenceFlow_0m879d8</bpmn:incoming>
+      <bpmn:incoming>SequenceFlow_0le1ghn</bpmn:incoming>
     </bpmn:endEvent>
-    <bpmn:sequenceFlow id="SequenceFlow_0m879d8" sourceRef="ServiceTask_1luzsfd" targetRef="EndEvent_110wsp7" />
+    <bpmn:sequenceFlow id="SequenceFlow_0m879d8" sourceRef="ServiceTask_1luzsfd" targetRef="ServiceTask_0g4yqd2" />
+    <bpmn:serviceTask id="ServiceTask_0g4yqd2" name="Task 2">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="some-type" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>SequenceFlow_0m879d8</bpmn:incoming>
+      <bpmn:outgoing>SequenceFlow_0le1ghn</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sequenceFlow id="SequenceFlow_0le1ghn" sourceRef="ServiceTask_0g4yqd2" targetRef="EndEvent_110wsp7" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_16i55l0">
@@ -30,11 +42,18 @@
         <di:waypoint x="261" y="121" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape id="EndEvent_110wsp7_di" bpmnElement="EndEvent_110wsp7">
-        <dc:Bounds x="407" y="103" width="36" height="36" />
+        <dc:Bounds x="567" y="103" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="SequenceFlow_0m879d8_di" bpmnElement="SequenceFlow_0m879d8">
         <di:waypoint x="361" y="121" />
-        <di:waypoint x="407" y="121" />
+        <di:waypoint x="406" y="121" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="ServiceTask_0g4yqd2_di" bpmnElement="ServiceTask_0g4yqd2">
+        <dc:Bounds x="406" y="81" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="SequenceFlow_0le1ghn_di" bpmnElement="SequenceFlow_0le1ghn">
+        <di:waypoint x="506" y="121" />
+        <di:waypoint x="567" y="121" />
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
