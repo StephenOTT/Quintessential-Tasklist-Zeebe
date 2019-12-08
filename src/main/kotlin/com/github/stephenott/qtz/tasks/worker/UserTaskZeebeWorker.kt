@@ -1,169 +1,171 @@
 package com.github.stephenott.qtz.tasks.worker
 
-import com.github.stephenott.qtz.tasks.domain.UserTaskEntity
-import com.github.stephenott.qtz.tasks.domain.UserTaskState
-import com.github.stephenott.qtz.tasks.domain.ZeebeVariables
-import com.github.stephenott.qtz.tasks.repository.UserTasksRepository
-import io.micronaut.context.annotation.ConfigurationProperties
-import io.micronaut.context.annotation.Context
-import io.micronaut.context.event.ApplicationEventListener
-import io.micronaut.runtime.server.event.ServerStartupEvent
+import com.github.stephenott.qtz.zeebe.management.ZeebeManagementClientConfiguration
 import io.reactivex.Completable
 import io.reactivex.Flowable
 import io.reactivex.Single
 import io.reactivex.rxkotlin.subscribeBy
+import io.reactivex.schedulers.Schedulers
 import io.zeebe.client.ZeebeClient
+import io.zeebe.client.api.command.ClientStatusException
 import io.zeebe.client.api.response.ActivatedJob
 import java.time.Duration
-import java.time.Instant
-import java.util.*
-import javax.annotation.PostConstruct
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class StartupListener : ApplicationEventListener<ServerStartupEvent> {
+class UserTaskZeebeWorker() {
 
     @Inject
-    lateinit var worker: UserTaskZeebeWorker
-
-    override fun onApplicationEvent(event: ServerStartupEvent?) {
-        println("Creating User Task Worker...")
-        worker.startWorker()
-    }
-}
-
-@Singleton
-class UserTaskZeebeWorker(
-        val config: ZeebeUserTaskClientConfiguration
-) {
+    lateinit var zClientConfig: ZeebeManagementClientConfiguration
 
     @Inject
-    lateinit var userTaskRepository: UserTasksRepository
+    lateinit var userTaskWorkerConfig: ZeebeUserTaskWorkerConfiguration
 
-    fun startWorker() {
-        val zClient = createDefaultUserTaskZeebeClient(config)
-        println("<-------STARTING!!!------->")
-        Completable.fromCallable {
-            activateWorker(zClient)
-        }.doOnSubscribe {
-            println("Starting User Task Worker Polling...")
-        }.subscribeBy(
-                onError = {
-                    println("activate worker error.......")
-                },
-                onComplete = {
-                    println("User Task Long Poll has completed, restarting long poll...")
-                    startWorker()
-                })
-    }
+    @Inject
+    private lateinit var jobProcessor: UserTaskZeebeJobProcessor
 
-    private fun activateWorker(zClient: ZeebeClient) {
-        println("Starting Polling 1")
-        pollForZeebeJobs(zClient,
-                config.taskType,
-                config.workerName,
-                config.exclusiveLockTimeout,
-                config.maxTasksToLock)
-                .doOnError {
-                    println("ERROR when handling jobs...")
-                }.doOnComplete {
-                    println("polling complete")
-                }
-                .forEach { job ->
-                    println("procesing job...")
-                    val entity = zeebeJobToUserTaskEntity(job)
-                    userTaskRepository.save(entity)
-                            .doOnSuccess { ut ->
-                                println("User Task was captured from Zeebe and saved: ${ut.taskId}")
-                            }.doOnError { e ->
-                                println("User Task that was capture from Zeebe has failed to save in DB: Zeebe job ${job.key}, from workflow: ${job.workflowInstanceKey}.  Reporting failure to Zeebe cluster...")
-                                reportJobFailureToZeebe(zClient, job, "Failed to save User Task: ${e.message}")
-                            }.subscribe()
-                }
-    }
+    @Inject
+    private lateinit var jobFailedProcessor: UserTaskZeebeFailedJobProcessor
 
-    private fun reportJobFailureToZeebe(zClient: ZeebeClient, job: ActivatedJob, errorMessage: String): Completable {
-        return Completable.fromCallable {
-            zClient.newFailCommand(job.key)
-                    .retries(job.retries.minus(1))
-                    .errorMessage(errorMessage)
-                    .send().join() //@TODO Add timeouts
+    var workerActive: Boolean = false
+        private set
 
-        }.doOnSubscribe {
-            println("Attempting to report failure to Zeebe for job: ${job.key} with error message: ${errorMessage}.")
-        }.doOnComplete {
-            println("Successfully reported Failure of Job: ${job.key} with error message: ${errorMessage}.")
-        }.doOnError {
-            println("Unable to report failure of ${job.key}: Error was: ${it.message}")
+    private lateinit var zClient: ZeebeClient
+
+    private var currentActiveJobs: AtomicInteger = AtomicInteger(0)
+
+    fun start(): Completable {
+        return Completable.fromAction {
+            if (!workerActive) {
+                this.zClient = createDefaultUserTaskZeebeClient()
+
+                this.workerActive = true
+
+                //@TODO add retryWhen logic to support specific expected errors such as inability to connect to Zeebe broker
+
+                startTaskCapture()
+                        .repeatUntil { !this.workerActive }
+                        .subscribeOn(Schedulers.io())
+                        .subscribeBy(
+                                onError = {
+                                    if (it is ClientStatusException && it.message == "Channel shutdownNow invoked" && !workerActive){
+                                        workerActive = false
+                                        println("Worker was stopped due to requested stop command.")
+                                    } else {
+                                        workerActive = false
+                                        zClient.close()
+                                        throw IllegalStateException("Worker has unexpectedly stopped due to: ${it.message}", it)
+                                    }
+                                },
+                                //@TODO add error catching that caches when Channel ShutdownNow invoked error occurs (from when management controller stops the worker.
+                                onComplete = { println("Looping complete...") },
+                                onNext = {
+                                    if (it.isEmpty()) {
+                                        Thread.sleep(1000) // Wait for 1 second so looping does not occur at overly-aggressive rate
+                                    } else {
+                                        processJobs(it).subscribeBy(
+                                                onComplete = { println("Batch for processing jobs complete") },
+                                                onError = { println("Major error with processing jobs: ${it.message}") })
+                                    }
+                                }
+                        )
+            } else {
+                println("worker is already active, no need to start the worker.")
+            }
         }
     }
 
+    private fun processJobs(jobs: List<ActivatedJob>): Completable {
+        return Completable.fromAction {
+            Flowable.fromIterable(jobs).forEach { job ->
+                jobProcessor.processJob(job)
+                        .subscribeOn(Schedulers.io())
+                        .subscribeBy(
+                                onSuccess = {
+                                    this.currentActiveJobs.decrementAndGet()
+                                    println("User Task Job ${job.key} processing complete.")
+                                },
+                                onError = {
+                                    this.currentActiveJobs.decrementAndGet()
 
-    private fun zeebeJobToUserTaskEntity(job: ActivatedJob): UserTaskEntity {
-        return UserTaskEntity(
-                state = UserTaskState.NEW,
-                taskOriginalCapture = Instant.now(),
-                title = job.customHeaders["title"]
-                        ?: throw IllegalArgumentException("Missing task title configuration"),
-                description = job.customHeaders["description"],
-                priority = job.customHeaders["priority"]?.toInt() ?: 0,
-                assignee = job.customHeaders["assignee"],
-                candidateGroups = job.customHeaders["candidateGroups"]?.split(",")?.toSet(),
-                candidateUsers = job.customHeaders["candidateGroups"]?.split(",")?.toSet(),
-//                dueDate = Instant.parse(job.customHeaders["dueDate"]) ?: null,
-                dueDate = null,
-                formKey = job.customHeaders["formKey"]
-                        ?: throw IllegalArgumentException("formKey is missing."),
-                zeebeJobKey = job.key,
-                zeebeVariablesAtCapture = ZeebeVariables(job.variablesAsMap),
-                zeebeSource = config.zeebeClusterName,
-                zeebeBpmnProcessId = job.bpmnProcessId,
-                zeebeBpmnProcessVersion = job.workflowDefinitionVersion,
-                zeebeBpmnProcessKey = job.workflowKey,
-                zeebeElementInstanceKey = job.elementInstanceKey,
-                zeebeElementId = job.elementId,
-                zeebeJobDealine = Instant.ofEpochMilli(job.deadline),
-                zeebeJobRetriesRemaining = job.retries)
+                                    val errorMessage = it.message ?: "User Task failed to persist in the DB."
+
+                                    jobFailedProcessor.processFailedJob(this.zClient, job, errorMessage)
+                                }
+                        )
+            }
+        }
     }
 
-    private fun pollForZeebeJobs(zeebeClient: ZeebeClient,
-                                 jobType: String,
-                                 workerName: String,
-                                 taskLockTimeout: Duration,
-                                 maxJobsToActivate: Int): Flowable<ActivatedJob> {
-        println("starting polling 2")
+    fun stop(): Completable {
+        return Completable.fromAction {
+            if (!workerActive) {
+                println("Deactivation of worker was requested, but worker is already stopped.")
+            } else {
+                println("Stopping worker...")
+                this.workerActive = false
+                this.zClient.close()
+            }
+        }
+    }
 
+    private fun startTaskCapture(): Single<List<ActivatedJob>> {
+        return Single.fromCallable {
+            val currentActiveJobsSnapshot: Int = this.currentActiveJobs.get()
+            val maxJobsToActivate: Int = userTaskWorkerConfig.maxBatchSize - currentActiveJobsSnapshot
+
+            if (maxJobsToActivate != 0) {
+                check(currentActiveJobsSnapshot in 0..userTaskWorkerConfig.maxBatchSize,
+                        lazyMessage = { "Max Jobs bound/limit was out breached!" })
+
+                val jobs = pollForZeebeJobs(
+                        userTaskWorkerConfig.taskType,
+                        userTaskWorkerConfig.workerName,
+                        userTaskWorkerConfig.taskMaxZeebeLock,
+                        maxJobsToActivate)
+
+                        .toList()
+                        .doOnSuccess {
+                            println("Polling returned: ${it.size} jobs.")
+                        }
+                        .subscribeOn(Schedulers.io()).blockingGet()
+
+                this.currentActiveJobs.addAndGet(jobs.size)
+
+                jobs
+
+            } else {
+                listOf()
+            }
+        }
+    }
+
+    private fun pollForZeebeJobs(jobType: String, workerName: String, taskLockTimeout: Duration, maxJobsToActivate: Int): Flowable<ActivatedJob> {
         return Flowable.fromCallable {
-            zeebeClient.newActivateJobsCommand().jobType(jobType)
+            this.zClient.newActivateJobsCommand().jobType(jobType)
                     .maxJobsToActivate(maxJobsToActivate)
                     .timeout(taskLockTimeout)
                     .workerName(workerName)
-                    .send().join()
+                    .requestTimeout(zClientConfig.longPollTimeout)
+                    .send()
+                    .join(zClientConfig.longPollTimeout.seconds.plus(5), TimeUnit.SECONDS)
+
         }.doOnSubscribe {
-            println("Starting long poll for User Tasks...")
+            println("Starting Long Polling for $maxJobsToActivate jobs (${zClientConfig.longPollTimeout.seconds} second cycle)...")
         }.flatMap {
             Flowable.fromIterable(it.jobs)
         }
     }
 
-    private fun createDefaultUserTaskZeebeClient(config: ZeebeUserTaskClientConfiguration): ZeebeClient {
+    private fun createDefaultUserTaskZeebeClient(): ZeebeClient {
         return ZeebeClient.newClientBuilder()
-                .brokerContactPoint(config.zeebeBroker) //@TODO add rest of default configurations
+                .brokerContactPoint(zClientConfig.brokerContactPoint) //@TODO add rest of default configurations
+                .defaultRequestTimeout(zClientConfig.commandTimeout)
+                .defaultMessageTimeToLive(zClientConfig.messageTimeToLive)
                 .usePlaintext() //@TODO remove and replace with cert  /-/SECURITY/-/
                 .build()
     }
-
-}
-
-
-@ConfigurationProperties("userTask")
-@Context
-class ZeebeUserTaskClientConfiguration {
-    var taskType: String = "user-task"
-    var workerName: String = "user-task-worker:${UUID.randomUUID()}"
-    var exclusiveLockTimeout: Duration = Duration.ofDays(30)
-    var maxTasksToLock: Int = 1
-    var zeebeBroker: String = "localhost:26500"
-    var zeebeClusterName: String = "zeebe:${UUID.randomUUID()}"
 }

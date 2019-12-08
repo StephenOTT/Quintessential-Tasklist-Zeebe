@@ -5,7 +5,6 @@ import com.github.stephenott.qtz.zeebe.management.ZeebeManagementClientConfigura
 import io.micronaut.context.annotation.Secondary
 import io.reactivex.Single
 import io.zeebe.client.ZeebeClient
-import io.zeebe.client.api.ZeebeFuture
 import io.zeebe.client.api.response.DeploymentEvent
 import io.zeebe.client.api.response.WorkflowInstanceEvent
 import io.zeebe.model.bpmn.Bpmn
@@ -75,7 +74,7 @@ class ZeebeManagementRepositoryImpl(
     companion object {
         fun createDefaultZeebeClient(config: ZeebeManagementClientConfiguration): ZeebeClient {
             return ZeebeClient.newClientBuilder()
-                    .brokerContactPoint(config.broker) //@TODO add rest of default configurations
+                    .brokerContactPoint(config.brokerContactPoint) //@TODO add rest of default configurations
                     .usePlaintext() //@TODO remove and replace with cert  /-/SECURITY/-/
                     .build()
         }

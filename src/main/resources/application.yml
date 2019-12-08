@@ -21,7 +21,7 @@ jpa:
     properties:
       hibernate:
         hbm2ddl:
-          auto: create-drop
+          auto: update
         show_sql: true
 
 flyway:
@@ -36,4 +36,8 @@ formValidatorService:
 zeebe:
   management:
     client:
-      broker: "localhost:26500"
+      brokerContactPoint: localhost:26500
+      longPollTimeout: 30s
+
+userTask:
+  maxBatchSize: 10

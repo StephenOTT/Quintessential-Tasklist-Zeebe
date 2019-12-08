@@ -1,6 +1,7 @@
 package com.github.stephenott.qtz.zeebe.management.controler
 
 import com.github.stephenott.qtz.tasks.domain.ZeebeVariables
+import com.github.stephenott.qtz.tasks.worker.UserTaskZeebeWorker
 import com.github.stephenott.qtz.zeebe.management.ZeebeManagementClientConfiguration
 import com.github.stephenott.qtz.zeebe.management.repository.ZeebeManagementRepository
 import io.micronaut.http.HttpRequest
@@ -22,6 +23,9 @@ open class ZeebeManagementController(
 
     @Inject
     lateinit var zeebeManagementRepository: ZeebeManagementRepository
+
+    @Inject
+    lateinit var userTaskZeebeWorker: UserTaskZeebeWorker
 
     @Post(value = "/workflow/deployment", consumes = [MediaType.MULTIPART_FORM_DATA])
     override fun deployWorkflow(workflow: StreamingFileUpload): Single<HttpResponse<WorkflowDeploymentResponse>> {
@@ -54,6 +58,24 @@ open class ZeebeManagementController(
         //@TODO add better error handling for when workflow creation fails.
     }
 
+    @Post("/worker/start")
+    override fun startWorker(): Single<HttpResponse<Unit>> {
+        return if (userTaskZeebeWorker.workerActive){
+            Single.just(HttpResponse.ok())
+        } else {
+            userTaskZeebeWorker.start().toSingleDefault(HttpResponse.ok())
+        }
+    }
+
+    @Post("/worker/stop")
+    override fun stopWorker(): Single<HttpResponse<Unit>> {
+        return if (userTaskZeebeWorker.workerActive){
+            userTaskZeebeWorker.stop().toSingleDefault(HttpResponse.ok())
+        } else {
+            Single.just(HttpResponse.ok())
+        }
+    }
+
     @Error
     fun fileUploadError(request: HttpRequest<*>, exception: ZeebeFileUploadException): HttpResponse<WorkflowDeploymentFailedResponse> {
         return HttpResponse.badRequest(exception.responseBody)
@@ -70,6 +92,10 @@ interface ZeebeManagementOperations {
     fun deployWorkflow(workflow: StreamingFileUpload): Single<HttpResponse<WorkflowDeploymentResponse>>
 
     fun createWorkflowInstance(instanceCreationRequest: WorkflowInstanceCreateRequest): Single<HttpResponse<WorkflowInstanceEvent>>
+
+    fun startWorker(): Single<HttpResponse<Unit>>
+
+    fun stopWorker(): Single<HttpResponse<Unit>>
 
 }
 
