@@ -1,5 +1,7 @@
 package com.github.stephenott.qtz.tasks.domain
 
+import com.fasterxml.jackson.annotation.JsonAnyGetter
+import com.fasterxml.jackson.annotation.JsonAnySetter
 import io.micronaut.data.annotation.DateUpdated
 import java.time.Instant
 import java.util.*
@@ -81,5 +83,5 @@ enum class UserTaskState {
     NEW, ASSIGNED, UNASSIGNED, COMPLETED
 }
 
-data class ZeebeVariables(val variables: Map<String, Any?>? = null)
+data class ZeebeVariables(@JsonAnySetter @get:JsonAnyGetter val variables: Map<String, Any?>? = null)
 data class UserTaskMetadata(val metadata: Map<String, Any?>? = null)

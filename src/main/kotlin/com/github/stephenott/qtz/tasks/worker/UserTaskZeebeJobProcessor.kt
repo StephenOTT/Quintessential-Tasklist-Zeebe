@@ -1,21 +1,17 @@
 package com.github.stephenott.qtz.tasks.worker
 
+import com.github.stephenott.qtz.executors.JobProcessor
 import com.github.stephenott.qtz.tasks.domain.UserTaskEntity
 import com.github.stephenott.qtz.tasks.domain.UserTaskState
 import com.github.stephenott.qtz.tasks.domain.ZeebeVariables
 import com.github.stephenott.qtz.tasks.repository.UserTasksRepository
 import com.github.stephenott.qtz.zeebe.management.ZeebeManagementClientConfiguration
-import com.github.stephenott.qtz.zeebe.management.repository.ZeebeManagementRepository
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
 import io.zeebe.client.api.response.ActivatedJob
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
-
-interface JobProcessor {
-    fun processJob(job: ActivatedJob): Single<UserTaskEntity>
-}
 
 @Singleton
 class UserTaskZeebeJobProcessor: JobProcessor {
@@ -51,7 +47,7 @@ class UserTaskZeebeJobProcessor: JobProcessor {
                 assignee = job.customHeaders["assignee"],
                 candidateGroups = job.customHeaders["candidateGroups"]?.split(",")?.toSet(),
                 candidateUsers = job.customHeaders["candidateGroups"]?.split(",")?.toSet(),
-//                dueDate = Instant.parse(job.customHeaders["dueDate"]) ?: null,
+//                dueDate = Instant.parse(job.customHeaders["dueDate"]) ?: null, //@TODO!!!
                 dueDate = null,
                 formKey = job.customHeaders["formKey"]
                         ?: throw IllegalArgumentException("formKey is missing."),

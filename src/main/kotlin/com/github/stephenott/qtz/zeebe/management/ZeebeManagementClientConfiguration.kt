@@ -7,32 +7,40 @@ import java.time.Duration
 import java.util.*
 import javax.validation.constraints.NotBlank
 
+interface ZeebeClientConfiguration{
+    var brokerContactPoint: String
+    var clusterName: String
+    var longPollTimeout: Duration
+    var commandTimeout: Duration
+    var messageTimeToLive: Duration
+}
+
 @ConfigurationProperties("zeebe.management.client")
 @Context
-class ZeebeManagementClientConfiguration {
+class ZeebeManagementClientConfiguration: ZeebeClientConfiguration {
 
     /**
      * The zeebe broker contact point URL
      */
-    var brokerContactPoint: String = "localhost:26500"
+    override var brokerContactPoint: String = "localhost:26500"
 
     /**
      * The name of the Zeebe Cluster.  Used by the User Task DB to track what Zeebe Cluster the user task belongs to.
      */
-    var clusterName: String = "zeebe:${UUID.randomUUID()}"
+    override var clusterName: String = "zeebe:${UUID.randomUUID()}"
 
     /**
      * The max duration of the Zeebe long poll for user tasks.
      */
-    var longPollTimeout: Duration = Duration.ofMinutes(10)
+    override var longPollTimeout: Duration = Duration.ofMinutes(10)
 
     /**
      * The max duration of the Zeebe gRPC commands except for the Long poll, which is covered with the longPollTimeout.
      */
-    var commandTimeout: Duration = Duration.ofSeconds(30)
+    override var commandTimeout: Duration = Duration.ofSeconds(30)
 
     /**
      * The message time to live for Zeebe.
      */
-    var messageTimeToLive: Duration = Duration.ofHours(1)
+    override var messageTimeToLive: Duration = Duration.ofHours(1)
 }

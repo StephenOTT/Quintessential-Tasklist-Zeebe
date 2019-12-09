@@ -1,35 +1,24 @@
-package com.github.stephenott.qtz.tasks.worker
+package com.github.stephenott.qtz.executors.script.python
 
 import com.github.stephenott.qtz.executors.GenericWorker
 import com.github.stephenott.qtz.zeebe.management.ZeebeManagementClientConfiguration
-import io.reactivex.Completable
-import io.reactivex.Flowable
-import io.reactivex.Single
-import io.reactivex.rxkotlin.subscribeBy
-import io.reactivex.schedulers.Schedulers
-import io.zeebe.client.ZeebeClient
-import io.zeebe.client.api.command.ClientStatusException
-import io.zeebe.client.api.response.ActivatedJob
-import java.time.Duration
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class UserTaskZeebeWorker() {
+class PythonExecutorZeebeWorker() {
 
     @Inject
     lateinit var zClientConfig: ZeebeManagementClientConfiguration
 
     @Inject
-    lateinit var userTaskWorkerConfig: ZeebeUserTaskWorkerConfiguration
+    lateinit var workerConfig: PythonExecutorWorkerConfiguration
 
     @Inject
-    private lateinit var jobProcessor: UserTaskZeebeJobProcessor
+    private lateinit var jobProcessor: PythonExecutorJobProcessor
 
     @Inject
-    private lateinit var jobFailedProcessor: UserTaskZeebeFailedJobProcessor
+    private lateinit var jobFailedProcessor: PythonExecutorFailedJobProcessor
 
     private lateinit var worker: GenericWorker
 
@@ -37,7 +26,7 @@ class UserTaskZeebeWorker() {
         worker = GenericWorker(jobProcessor,
                 jobFailedProcessor,
                 zClientConfig,
-                userTaskWorkerConfig)
+                workerConfig)
         return worker
     }
 

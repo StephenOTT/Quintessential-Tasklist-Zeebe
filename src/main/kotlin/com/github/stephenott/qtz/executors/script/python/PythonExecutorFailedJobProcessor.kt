@@ -1,5 +1,6 @@
-package com.github.stephenott.qtz.tasks.worker
+package com.github.stephenott.qtz.executors.script.python
 
+import com.github.stephenott.qtz.executors.JobFailedProcessor
 import com.github.stephenott.qtz.zeebe.management.ZeebeManagementClientConfiguration
 import io.reactivex.Completable
 import io.reactivex.schedulers.Schedulers
@@ -9,12 +10,8 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
-interface JobFailedProcessor {
-    fun processFailedJob(zClient: ZeebeClient, job: ActivatedJob, errorMessage: String): Completable
-}
-
 @Singleton
-class UserTaskZeebeFailedJobProcessor: JobFailedProcessor {
+class PythonExecutorFailedJobProcessor: JobFailedProcessor {
 
     @Inject
     private lateinit var zClientConfig: ZeebeManagementClientConfiguration
@@ -29,11 +26,11 @@ class UserTaskZeebeFailedJobProcessor: JobFailedProcessor {
 
         }.subscribeOn(Schedulers.io())
                 .doOnSubscribe {
-                    println("Attempting to report failure to Zeebe for job: ${job.key} with error message: ${errorMessage}.")
+                    println("Attempting to report failure of Python Executor job: ${job.key} with error message: ${errorMessage}.")
                 }.doOnComplete {
-                    println("Successfully reported Failure of Job: ${job.key} with error message: ${errorMessage}.")
+                    println("Successfully reported Failure of Python Executor Job: ${job.key} with error message: ${errorMessage}.")
                 }.doOnError {
-                    println("Unable to report failure of ${job.key}: Error was: ${it.message}")
+                    println("Unable to report Python Executor job ${job.key} failure: Error was: ${it.message}")
                 }
     }
 

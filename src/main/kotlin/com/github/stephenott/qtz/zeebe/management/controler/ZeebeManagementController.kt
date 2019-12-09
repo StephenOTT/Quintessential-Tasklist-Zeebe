@@ -1,5 +1,6 @@
 package com.github.stephenott.qtz.zeebe.management.controler
 
+import com.github.stephenott.qtz.executors.script.python.PythonExecutorZeebeWorker
 import com.github.stephenott.qtz.tasks.domain.ZeebeVariables
 import com.github.stephenott.qtz.tasks.worker.UserTaskZeebeWorker
 import com.github.stephenott.qtz.zeebe.management.ZeebeManagementClientConfiguration
@@ -27,6 +28,9 @@ open class ZeebeManagementController(
     @Inject
     lateinit var userTaskZeebeWorker: UserTaskZeebeWorker
 
+    @Inject
+    lateinit var pythonExecutorZeebeWorker: PythonExecutorZeebeWorker
+
     @Post(value = "/workflow/deployment", consumes = [MediaType.MULTIPART_FORM_DATA])
     override fun deployWorkflow(workflow: StreamingFileUpload): Single<HttpResponse<WorkflowDeploymentResponse>> {
         val tempFile = File.createTempFile(workflow.filename, "_temp_bpmn") //@TODO make this configurable
@@ -48,29 +52,51 @@ open class ZeebeManagementController(
     }
 
     @Post("/workflow/instance")
-    override fun createWorkflowInstance(@Body instanceCreationRequest: WorkflowInstanceCreateRequest): Single<HttpResponse<WorkflowInstanceEvent>> {
-        return zeebeManagementRepository.createWorkflowInstance(
-                instanceCreationRequest.workflowKey,
-                instanceCreationRequest.startVariables)
-                .map {
-                    HttpResponse.created(it)
-                }
+    override fun createWorkflowInstance(@Body instanceCreationRequest: Single<WorkflowInstanceCreateRequest>): Single<HttpResponse<WorkflowInstanceEvent>> {
+        return instanceCreationRequest.flatMap {
+            println("VARIABLES_FROM_REQ: ${it.startVariables} ${it.startVariables.variables}")
+            zeebeManagementRepository.createWorkflowInstance(
+                    it.workflowKey,
+                    it.startVariables)
+                    .map { response ->
+                        HttpResponse.created(response)
+                    }
+        }
+
         //@TODO add better error handling for when workflow creation fails.
     }
 
-    @Post("/worker/start")
-    override fun startWorker(): Single<HttpResponse<Unit>> {
-        return if (userTaskZeebeWorker.workerActive){
+    @Post("/worker/usertask/start")
+    override fun startUserTaskWorker(): Single<HttpResponse<Unit>> {
+        return if (userTaskZeebeWorker.getWorker().workerIsActive()){
             Single.just(HttpResponse.ok())
         } else {
-            userTaskZeebeWorker.start().toSingleDefault(HttpResponse.ok())
+            userTaskZeebeWorker.getWorker().start().toSingleDefault(HttpResponse.ok())
         }
     }
 
-    @Post("/worker/stop")
-    override fun stopWorker(): Single<HttpResponse<Unit>> {
-        return if (userTaskZeebeWorker.workerActive){
-            userTaskZeebeWorker.stop().toSingleDefault(HttpResponse.ok())
+    @Post("/worker/usertask/stop")
+    override fun stopUserTaskWorker(): Single<HttpResponse<Unit>> {
+        return if (userTaskZeebeWorker.getWorker().workerIsActive()){
+            userTaskZeebeWorker.getWorker().stop().toSingleDefault(HttpResponse.ok())
+        } else {
+            Single.just(HttpResponse.ok())
+        }
+    }
+
+    @Post("/worker/executors/python/start")
+    override fun startPythonExecutorWorker(): Single<HttpResponse<Unit>> {
+        return if (pythonExecutorZeebeWorker.getWorker().workerIsActive()){
+            Single.just(HttpResponse.ok())
+        } else {
+            pythonExecutorZeebeWorker.getWorker().start().toSingleDefault(HttpResponse.ok())
+        }
+    }
+
+    @Post("/worker/executors/python/stop")
+    override fun stopPythonExecutorWorker(): Single<HttpResponse<Unit>> {
+        return if (pythonExecutorZeebeWorker.getWorker().workerIsActive()){
+            pythonExecutorZeebeWorker.getWorker().stop().toSingleDefault(HttpResponse.ok())
         } else {
             Single.just(HttpResponse.ok())
         }
@@ -91,11 +117,15 @@ interface ZeebeManagementOperations {
 
     fun deployWorkflow(workflow: StreamingFileUpload): Single<HttpResponse<WorkflowDeploymentResponse>>
 
-    fun createWorkflowInstance(instanceCreationRequest: WorkflowInstanceCreateRequest): Single<HttpResponse<WorkflowInstanceEvent>>
+    fun createWorkflowInstance(instanceCreationRequest: Single<WorkflowInstanceCreateRequest>): Single<HttpResponse<WorkflowInstanceEvent>>
 
-    fun startWorker(): Single<HttpResponse<Unit>>
+    fun startUserTaskWorker(): Single<HttpResponse<Unit>>
 
-    fun stopWorker(): Single<HttpResponse<Unit>>
+    fun stopUserTaskWorker(): Single<HttpResponse<Unit>>
+
+    fun startPythonExecutorWorker(): Single<HttpResponse<Unit>>
+
+    fun stopPythonExecutorWorker(): Single<HttpResponse<Unit>>
 
 }
 

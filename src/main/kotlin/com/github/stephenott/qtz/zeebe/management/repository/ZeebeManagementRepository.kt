@@ -34,7 +34,7 @@ class ZeebeManagementRepositoryImpl(
         return Single.fromCallable {
             zClient.newCreateInstanceCommand()
                     .workflowKey(workflowKey)
-                    .variables(startVariables)
+                    .variables(startVariables.variables ?: mapOf())
                     .send().join(10, TimeUnit.SECONDS)
 
         }.doOnSubscribe {

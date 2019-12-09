@@ -40,4 +40,10 @@ zeebe:
       longPollTimeout: 30s
 
 userTask:
+  enabled: false
   maxBatchSize: 10
+
+executors:
+  python:
+    enabled: true
+    scriptFolder: "~/python-scripts"
