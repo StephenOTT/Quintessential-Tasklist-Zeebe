@@ -22,7 +22,7 @@ class ZeebeUserTaskWorkerConfiguration: WorkerConfiguration {
     /**
      * The worker name that Zeebe Jobs will be locked with.
      */
-    override var workerName: String = "user-task-worker:${UUID.randomUUID()}"
+    override var workerName: String = "User-Task-Worker:${UUID.randomUUID()}"
 
     /**
      * The Zeebe job exclusiveLockTimeout value.  Represents the User Task lock.

@@ -83,5 +83,5 @@ enum class UserTaskState {
     NEW, ASSIGNED, UNASSIGNED, COMPLETED
 }
 
-data class ZeebeVariables(@JsonAnySetter @get:JsonAnyGetter val variables: Map<String, Any?>? = null)
+data class ZeebeVariables(@JsonAnySetter @get:JsonAnyGetter val variables: Map<String, Any?> = mapOf())
 data class UserTaskMetadata(val metadata: Map<String, Any?>? = null)

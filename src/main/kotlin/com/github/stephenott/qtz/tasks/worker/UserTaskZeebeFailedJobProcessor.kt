@@ -23,7 +23,7 @@ class UserTaskZeebeFailedJobProcessor: JobFailedProcessor {
                     .retries(job.retries.minus(1))
                     .errorMessage(errorMessage)
                     .send()
-                    .join(zClientConfig.commandTimeout.seconds.plus(5), TimeUnit.SECONDS)
+                    .join(zClientConfig.commandTimeout.seconds.plus(2), TimeUnit.SECONDS)
 
         }.subscribeOn(Schedulers.io())
                 .doOnSubscribe {

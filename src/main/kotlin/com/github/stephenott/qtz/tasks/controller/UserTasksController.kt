@@ -129,6 +129,9 @@ open class UserTasksController() : UserTasksOperations {
                                 Single.error(it)
                             }
 
+                    //@TODO add save to Zeebe + Transaction rollback support?
+                    //Make it a background query
+
                 }.onErrorResumeNext {
                     Single.error(it) // @TODO add better error message
                 }.map {

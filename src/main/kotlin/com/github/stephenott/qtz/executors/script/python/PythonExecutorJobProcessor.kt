@@ -1,6 +1,8 @@
 package com.github.stephenott.qtz.executors.script.python
 
 import com.github.stephenott.qtz.executors.JobProcessor
+import com.github.stephenott.qtz.executors.JobResult
+import com.github.stephenott.qtz.tasks.domain.ZeebeVariables
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
 import io.zeebe.client.api.response.ActivatedJob
@@ -12,32 +14,32 @@ import javax.inject.Singleton
 class PythonExecutorJobProcessor : JobProcessor {
 
     @Inject
-    private lateinit var pythonConfigWorker: PythonExecutorWorkerConfiguration
+    private lateinit var workerConfig: PythonExecutorWorkerConfiguration
 
     @Inject
     lateinit var executor: PythonExecutor
 
-    override fun processJob(job: ActivatedJob): Single<Map<String, Any?>> {
+    override fun processJob(job: ActivatedJob): Single<JobResult> {
         return Single.fromCallable {
-            println("Processing Python Job ${job.key}...")
+            println("${workerConfig.workerName} Processing Python Job ${job.key}...")
 
             val fileName = job.customHeaders["script"] ?: throw IllegalArgumentException("missing script parameter in job header")
 
-            val scriptFile = File(pythonConfigWorker.scriptFolder, fileName)
-
-            println("VARIABLES1: ${job.variables}")
+            val scriptFile = File(workerConfig.scriptFolder, fileName)
 
             val inputs = job.variablesAsMap
 
-            executor.execute(scriptFile, inputs)
+            val executionResult = executor.execute(scriptFile, inputs)
                     .doOnSuccess {
-                        println("Result: $it")
+                        println("${workerConfig.workerName} Python Execution Result: $it")
 
                     }.doOnError {
-                        println("Script Execution resulted in a error (script may have successfully executed, but parsing result failed: see stacktrace.)")
+                        println("${workerConfig.workerName} Python Script Execution resulted in a error (script may have successfully executed, but parsing result failed: see stacktrace.)")
                         it.printStackTrace()
 
                     }.subscribeOn(Schedulers.io()).blockingGet()
+
+            JobResult(resultVariables = ZeebeVariables(executionResult))
         }
     }
 }

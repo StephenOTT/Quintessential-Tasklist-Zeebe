@@ -27,7 +27,7 @@ class PythonExecutor: CodeExecutor {
                          executionTimeout: Duration): Single<Map<String, Any?>> {
         return Single.fromCallable {
             val inputFile: File = File.createTempFile(UUID.randomUUID().toString(), "-python-executor-input" )
-            println("INPUTS: $inputs")
+
             jsonMapper.writeValue(inputFile, inputs)
 
             val executor: ExecutorService = Executors.newSingleThreadExecutor()
@@ -51,15 +51,15 @@ class PythonExecutor: CodeExecutor {
                     inputFile.delete()
                     jsonMapper.readValue<Map<String, Any?>>(output)
                 } catch(e: Exception) {
-                    println("Output from Script: $output")
+                    println("${executorConfig.workerName} Python Script Output: $output")
                     throw IllegalStateException("Script successfully executed but orchestrator failed to read result into JSON...", e)
                 }
 
             } else {
-                println("Exit Code: $exitCode")
+                println("${executorConfig.workerName} Python Script Execution Exit Code: $exitCode")
 
                 val errorOutput: String = process.errorStream.bufferedReader().use { it.readText() }
-                println("Failed Script Execution: $errorOutput")
+                println("${executorConfig.workerName} Python Script Execution returned a failing error code: $errorOutput")
                 throw IllegalStateException("Failed Script Execution")
             }
         }

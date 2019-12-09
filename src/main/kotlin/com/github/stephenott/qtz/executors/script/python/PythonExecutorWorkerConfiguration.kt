@@ -17,7 +17,7 @@ class PythonExecutorWorkerConfiguration: WorkerConfiguration {
 
     override var taskType: String = "script-python"
 
-    override var workerName: String = "Python-Executor-${UUID.randomUUID()}"
+    override var workerName: String = "Python-Executor-Worker:${UUID.randomUUID()}"
 
     override var taskMaxZeebeLock: Duration = Duration.ofSeconds(60)
 

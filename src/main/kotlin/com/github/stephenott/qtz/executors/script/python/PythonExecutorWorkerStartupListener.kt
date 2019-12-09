@@ -17,16 +17,17 @@ class PythonExecutorWorkerStartupListener : ApplicationEventListener<ServerStart
 
     override fun onApplicationEvent(event: ServerStartupEvent?) {
         if (workerConfig.enabled) {
-            println("Creating and Starting Python Executor Worker...")
+
+            println("${workerConfig.workerName} Creating and Starting Python Executor Worker...")
 
             pythonExecutorWorker.create().start()
                     .doOnComplete {
-                        println("Python Executor Worker has started")
+                        println("${workerConfig.workerName} Python Executor Worker has started")
                     }
                     .subscribeOn(Schedulers.io()).subscribe()
 
         } else {
-            println("Python Executor Worker is disabled in configuration.")
+            println("${workerConfig.workerName} Python Executor Worker is disabled in configuration.")
         }
     }
 }

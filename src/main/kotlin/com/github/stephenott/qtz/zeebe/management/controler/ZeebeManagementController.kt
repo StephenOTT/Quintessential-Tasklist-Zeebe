@@ -54,7 +54,6 @@ open class ZeebeManagementController(
     @Post("/workflow/instance")
     override fun createWorkflowInstance(@Body instanceCreationRequest: Single<WorkflowInstanceCreateRequest>): Single<HttpResponse<WorkflowInstanceEvent>> {
         return instanceCreationRequest.flatMap {
-            println("VARIABLES_FROM_REQ: ${it.startVariables} ${it.startVariables.variables}")
             zeebeManagementRepository.createWorkflowInstance(
                     it.workflowKey,
                     it.startVariables)

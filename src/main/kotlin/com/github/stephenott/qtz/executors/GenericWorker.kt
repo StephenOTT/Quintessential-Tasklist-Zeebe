@@ -1,5 +1,6 @@
 package com.github.stephenott.qtz.executors
 
+import com.github.stephenott.qtz.tasks.domain.ZeebeVariables
 import com.github.stephenott.qtz.tasks.worker.*
 import com.github.stephenott.qtz.zeebe.management.ZeebeClientConfiguration
 import io.reactivex.Completable
@@ -27,7 +28,7 @@ class GenericWorker(
 
     private var currentActiveJobs: AtomicInteger = AtomicInteger(0)
 
-    fun getWorkerName(): String{
+    fun getWorkerName(): String {
         return workerConfig.workerName
     }
 
@@ -46,32 +47,49 @@ class GenericWorker(
 
                 startTaskCapture()
                         .repeatUntil { !this.workerActive }
-                        .subscribeOn(Schedulers.io())
-                        .subscribeBy(
+                        .subscribeOn(Schedulers.io()).subscribeBy(
                                 onError = {
-                                    if (it is ClientStatusException && it.message == "Channel shutdownNow invoked" && !workerActive){
+                                    if (it is ClientStatusException && it.message == "Channel shutdownNow invoked" && !workerActive) {
                                         workerActive = false
-                                        println("Worker was stopped due to requested stop command.")
+
+                                        println("${getWorkerName()} worker was stopped due to requested stop command.")
+
                                     } else {
                                         workerActive = false
+
                                         zClient.close()
-                                        throw IllegalStateException("Worker has unexpectedly stopped due to: ${it.message}", it)
+
+                                        throw IllegalStateException("${getWorkerName()} Worker has unexpectedly stopped due to: ${it.message}", it)
                                     }
                                 },
                                 //@TODO add error catching that caches when Channel ShutdownNow invoked error occurs (from when management controller stops the worker.
-                                onComplete = { println("Looping complete...") },
+                                onComplete = {
+                                    println("${getWorkerName()} Looping complete...")
+                                },
                                 onNext = {
                                     if (it.isEmpty()) {
                                         Thread.sleep(1000) // Wait for 1 second so looping does not occur at overly-aggressive rate
                                     } else {
                                         processJobs(it).subscribeBy(
-                                                onComplete = { println("Batch for processing jobs complete") },
-                                                onError = { println("Major error with processing jobs: ${it.message}") })
+                                                onComplete = { println("${getWorkerName()} batch for processing jobs complete") },
+                                                onError = { println("Major error with ${getWorkerName()} processing jobs: ${it.message}") })
                                     }
                                 }
                         )
             } else {
-                println("worker is already active, no need to start the worker.")
+                println("${getWorkerName()} worker is already active, no need to start the worker.")
+            }
+        }
+    }
+
+    fun stop(): Completable {
+        return Completable.fromAction {
+            if (!workerActive) {
+                println("${getWorkerName()} Deactivation of worker was requested, but worker is already stopped.")
+            } else {
+                println("${getWorkerName()} Stopping worker...")
+                this.workerActive = false
+                this.zClient.close()
             }
         }
     }
@@ -80,16 +98,31 @@ class GenericWorker(
         return Completable.fromAction {
             Flowable.fromIterable(jobs).forEach { job ->
                 jobProcessor.processJob(job)
-                        .subscribeOn(Schedulers.io())
-                        .subscribeBy(
-                                onSuccess = {
+                        .subscribeOn(Schedulers.io()).subscribeBy(
+                                onSuccess = { jobResult ->
                                     this.currentActiveJobs.decrementAndGet()
-                                    println("Worker ${getWorkerName()} has completed processing Job ${job.key} processing.")
+
+                                    println("${getWorkerName()} Worker has completed processing Job ${job.key}.")
+
+                                    if (jobResult.reportResult) {
+                                        reportJobSuccess(job, jobResult.resultVariables)
+                                                .subscribeOn(Schedulers.io())
+                                                .subscribeBy(
+                                                        onError = { error ->
+                                                            //@TODO add retry support
+                                                            println("${getWorkerName()} Failed to report success of job ${job.key} back to Zeebe: ${error.message}")
+                                                            error.printStackTrace()
+                                                        },
+                                                        onComplete = {
+                                                            println("${getWorkerName()} Job ${job.key} was successfully reported as a success to Zeebe.")
+                                                        })
+                                    }
                                 },
                                 onError = {
                                     this.currentActiveJobs.decrementAndGet()
 
-                                    val errorMessage = it.message ?: "Job ${job.key} failed to complete successfully."
+                                    val errorMessage = it.message
+                                            ?: "${getWorkerName()} Job ${job.key} failed to complete successfully."
 
                                     jobFailedProcessor.processFailedJob(this.zClient, job, errorMessage)
                                 }
@@ -98,15 +131,11 @@ class GenericWorker(
         }
     }
 
-    fun stop(): Completable {
+    private fun reportJobSuccess(job: ActivatedJob, resultVariables: ZeebeVariables): Completable {
         return Completable.fromAction {
-            if (!workerActive) {
-                println("Deactivation of worker was requested, but worker is already stopped.")
-            } else {
-                println("Stopping worker...")
-                this.workerActive = false
-                this.zClient.close()
-            }
+            zClient.newCompleteCommand(job.key)
+                    .variables(resultVariables.variables)
+                    .send().join(zClientConfig.commandTimeout.seconds.plus(1), TimeUnit.SECONDS)
         }
     }
 
@@ -117,7 +146,7 @@ class GenericWorker(
 
             if (maxJobsToActivate != 0) {
                 check(currentActiveJobsSnapshot in 0..this.workerConfig.maxBatchSize,
-                        lazyMessage = { "Max Jobs bound/limit was out breached!" })
+                        lazyMessage = { "${getWorkerName()} Max Jobs bound/limit was out breached!" })
 
                 val jobs = pollForZeebeJobs(
                         this.workerConfig.taskType,
@@ -127,7 +156,7 @@ class GenericWorker(
 
                         .toList()
                         .doOnSuccess {
-                            println("Polling returned: ${it.size} jobs.")
+                            println("${getWorkerName()} Polling returned: ${it.size} jobs.")
                         }
                         .subscribeOn(Schedulers.io()).blockingGet()
 
@@ -152,7 +181,7 @@ class GenericWorker(
                     .join(zClientConfig.longPollTimeout.seconds.plus(5), TimeUnit.SECONDS)
 
         }.doOnSubscribe {
-            println("Starting Long Polling for $maxJobsToActivate jobs (${zClientConfig.longPollTimeout.seconds} second cycle)...")
+            println("${getWorkerName()} Starting Long Polling for $maxJobsToActivate jobs (${zClientConfig.longPollTimeout.seconds} second cycle)...")
         }.flatMap {
             Flowable.fromIterable(it.jobs)
         }

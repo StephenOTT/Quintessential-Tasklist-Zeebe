@@ -1,6 +1,7 @@
 package com.github.stephenott.qtz.tasks.worker
 
 import com.github.stephenott.qtz.executors.JobProcessor
+import com.github.stephenott.qtz.executors.JobResult
 import com.github.stephenott.qtz.tasks.domain.UserTaskEntity
 import com.github.stephenott.qtz.tasks.domain.UserTaskState
 import com.github.stephenott.qtz.tasks.domain.ZeebeVariables
@@ -20,18 +21,23 @@ class UserTaskZeebeJobProcessor: JobProcessor {
     private lateinit var userTaskRepository: UserTasksRepository
 
     @Inject
+    private lateinit var workerConfig: ZeebeUserTaskWorkerConfiguration
+
+    @Inject
     private lateinit var zClientConfig: ZeebeManagementClientConfiguration
 
-    override fun processJob(job: ActivatedJob): Single<UserTaskEntity> {
+    override fun processJob(job: ActivatedJob): Single<JobResult> {
         return Single.fromCallable {
-            println("Processing Job...")
-            Thread.sleep(10000)
+            println("${workerConfig.workerName} Processing User Task Job...")
             val entity = zeebeJobToUserTaskEntity(job, this.zClientConfig)
-            userTaskRepository.save(entity)
+            val taskEntity = userTaskRepository.save(entity)
                     .subscribeOn(Schedulers.io())
                     .doOnSuccess { ut ->
                         println("User Task was captured from Zeebe and saved: ${ut.taskId}")
                     }.blockingGet()
+
+            JobResult(resultVariables = ZeebeVariables(mapOf(Pair("createdUserTask", taskEntity))),
+                    reportResult = false)
         }
 
     }
