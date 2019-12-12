@@ -1,7 +1,8 @@
-package com.github.stephenott.qtz.executors.script.python
+package com.github.stephenott.qtz.workers.python
 
-import com.github.stephenott.qtz.executors.JobProcessor
-import com.github.stephenott.qtz.executors.JobResult
+import com.github.stephenott.qtz.executors.script.python.PythonExecutor
+import com.github.stephenott.qtz.workers.JobProcessor
+import com.github.stephenott.qtz.workers.JobResult
 import com.github.stephenott.qtz.tasks.domain.ZeebeVariables
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers

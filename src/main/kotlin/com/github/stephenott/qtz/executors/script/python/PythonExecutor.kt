@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.*
 import com.github.stephenott.qtz.executors.CodeExecutor
+import com.github.stephenott.qtz.workers.python.PythonExecutorWorkerConfiguration
 import io.reactivex.Single
 import java.io.File
 import java.time.Duration

@@ -1,9 +1,9 @@
 package com.github.stephenott.qtz.zeebe.management.controler
 
-import com.github.stephenott.qtz.executors.script.python.PythonExecutorZeebeWorker
+import com.github.stephenott.qtz.workers.python.PythonExecutorZeebeWorker
 import com.github.stephenott.qtz.tasks.domain.ZeebeVariables
-import com.github.stephenott.qtz.tasks.worker.UserTaskZeebeWorker
-import com.github.stephenott.qtz.zeebe.management.ZeebeManagementClientConfiguration
+import com.github.stephenott.qtz.workers.usertask.UserTaskZeebeWorker
+import com.github.stephenott.qtz.zeebe.ZeebeManagementClientConfiguration
 import com.github.stephenott.qtz.zeebe.management.repository.ZeebeManagementRepository
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -129,10 +129,13 @@ interface ZeebeManagementOperations {
 }
 
 data class WorkflowDeploymentRequest(val name: String) // @TODO review usage need
+
 data class WorkflowDeploymentResponse(val result: String)
+
 data class WorkflowDeploymentFailedResponse(val reason: String)
 
 data class WorkflowInstanceCreateRequest(val workflowKey: Long, val startVariables: ZeebeVariables)
 
 class ZeebeFileUploadException(val responseBody: WorkflowDeploymentFailedResponse) : RuntimeException("File failed to upload.") {}
+
 class ZeebeFailedDeploymentException(val responseBody: WorkflowDeploymentFailedResponse) : RuntimeException("Zeebe Workflow Deployment Failure.") {}

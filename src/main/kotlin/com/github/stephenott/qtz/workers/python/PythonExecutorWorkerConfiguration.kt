@@ -1,6 +1,6 @@
-package com.github.stephenott.qtz.executors.script.python
+package com.github.stephenott.qtz.workers.python
 
-import com.github.stephenott.qtz.tasks.worker.WorkerConfiguration
+import com.github.stephenott.qtz.workers.WorkerConfiguration
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.annotation.Context
 import java.time.Duration

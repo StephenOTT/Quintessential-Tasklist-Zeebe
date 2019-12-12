@@ -1,19 +1,12 @@
-package com.github.stephenott.qtz.zeebe.management
+package com.github.stephenott.qtz.zeebe
 
+import com.github.stephenott.qtz.zeebe.ZeebeClientConfiguration
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.annotation.Context
 import io.micronaut.context.annotation.Value
 import java.time.Duration
 import java.util.*
 import javax.validation.constraints.NotBlank
-
-interface ZeebeClientConfiguration{
-    var brokerContactPoint: String
-    var clusterName: String
-    var longPollTimeout: Duration
-    var commandTimeout: Duration
-    var messageTimeToLive: Duration
-}
 
 @ConfigurationProperties("zeebe.management.client")
 @Context

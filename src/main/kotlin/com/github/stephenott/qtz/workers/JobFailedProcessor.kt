@@ -1,4 +1,4 @@
-package com.github.stephenott.qtz.executors
+package com.github.stephenott.qtz.workers
 
 import io.reactivex.Completable
 import io.zeebe.client.ZeebeClient

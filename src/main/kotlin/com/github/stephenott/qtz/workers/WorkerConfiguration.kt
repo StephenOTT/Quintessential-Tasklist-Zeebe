@@ -1,4 +1,4 @@
-package com.github.stephenott.qtz.tasks.worker
+package com.github.stephenott.qtz.workers
 
 import java.time.Duration
 

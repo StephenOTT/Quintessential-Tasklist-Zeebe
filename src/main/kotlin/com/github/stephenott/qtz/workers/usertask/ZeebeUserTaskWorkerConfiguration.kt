@@ -1,5 +1,6 @@
-package com.github.stephenott.qtz.tasks.worker
+package com.github.stephenott.qtz.workers.usertask
 
+import com.github.stephenott.qtz.workers.WorkerConfiguration
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.annotation.Context
 import java.time.Duration

@@ -1,5 +1,7 @@
-package com.github.stephenott.qtz.executors.script.python
+package com.github.stephenott.qtz.workers.python
 
+import com.github.stephenott.qtz.workers.python.PythonExecutorWorkerConfiguration
+import com.github.stephenott.qtz.workers.python.PythonExecutorZeebeWorker
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.runtime.server.event.ServerStartupEvent
 import io.reactivex.schedulers.Schedulers

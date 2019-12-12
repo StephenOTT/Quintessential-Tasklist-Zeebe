@@ -1,8 +1,9 @@
 package com.github.stephenott.qtz.zeebe.management.repository
 
 import com.github.stephenott.qtz.tasks.domain.ZeebeVariables
-import com.github.stephenott.qtz.zeebe.management.ZeebeManagementClientConfiguration
+import com.github.stephenott.qtz.zeebe.ZeebeManagementClientConfiguration
 import io.micronaut.context.annotation.Secondary
+import io.reactivex.Completable
 import io.reactivex.Single
 import io.zeebe.client.ZeebeClient
 import io.zeebe.client.api.response.DeploymentEvent
@@ -19,6 +20,8 @@ interface ZeebeManagementRepository {
 
     fun deployWorkflow(file: File, fileName: String): Single<DeploymentEvent>
     fun createWorkflowInstance(workflowKey: Long, startVariables: ZeebeVariables): Single<WorkflowInstanceEvent>
+    fun completeJob(jobKey: Long, completionVariables: ZeebeVariables): Completable
+    fun reportJobFailure(jobKey: Long, errorMessage: String, remainingRetries: Int = 0): Completable
 }
 
 //@TODO refactor to support multiple repositories? Or should just deploy multiple containers, each with their own config?
@@ -35,14 +38,14 @@ class ZeebeManagementRepositoryImpl(
             zClient.newCreateInstanceCommand()
                     .workflowKey(workflowKey)
                     .variables(startVariables.variables ?: mapOf())
-                    .send().join(10, TimeUnit.SECONDS)
+                    .send().join(config.commandTimeout.seconds + 1, TimeUnit.SECONDS)
 
         }.doOnSubscribe {
-            println("Starting workflow instance based on key: " + workflowKey)
+            println("${config.clusterName} Starting workflow instance based on key: " + workflowKey)
         }.doOnSuccess {
-            println("Workflow(${workflowKey}) instance started: ${it.workflowInstanceKey}")
+            println("${config.clusterName} Workflow(${workflowKey}) instance started: ${it.workflowInstanceKey}")
         }.doOnError {
-            println("Unable to start workflow instance: ${it.message}")
+            println("${config.clusterName} Unable to start workflow instance: ${it.message}")
         }
     }
 
@@ -63,7 +66,7 @@ class ZeebeManagementRepositoryImpl(
         return Single.fromCallable {
             zClient.newDeployCommand()
                     .addWorkflowModel(modelInstance, filename)
-                    .send().join(10, TimeUnit.SECONDS) // move timeout to configuration
+                    .send().join(config.commandTimeout.seconds + 1, TimeUnit.SECONDS)// move timeout to configuration
 
         }.onErrorResumeNext {
             it.printStackTrace()
@@ -71,10 +74,35 @@ class ZeebeManagementRepositoryImpl(
         }
     }
 
+    override fun reportJobFailure(jobKey: Long, errorMessage: String, remainingRetries: Int): Completable {
+        return Completable.fromCallable {
+            zClient.newFailCommand(jobKey)
+                    .retries(remainingRetries)
+                    .errorMessage(errorMessage)
+                    .send().join(config.commandTimeout.seconds + 1, TimeUnit.SECONDS)
+        }.onErrorResumeNext {
+            it.printStackTrace()
+            Completable.error(it)
+        }
+    }
+
+    override fun completeJob(jobKey: Long, completionVariables: ZeebeVariables): Completable {
+        return Completable.fromCallable {
+            zClient.newCompleteCommand(jobKey)
+                    .variables(completionVariables.variables)
+                    .send().join(config.commandTimeout.seconds + 1, TimeUnit.SECONDS)
+        }.onErrorResumeNext {
+            it.printStackTrace()
+            Completable.error(it)
+        }
+    }
+
     companion object {
         fun createDefaultZeebeClient(config: ZeebeManagementClientConfiguration): ZeebeClient {
             return ZeebeClient.newClientBuilder()
                     .brokerContactPoint(config.brokerContactPoint) //@TODO add rest of default configurations
+                    .defaultRequestTimeout(config.commandTimeout)
+                    .defaultMessageTimeToLive(config.messageTimeToLive)
                     .usePlaintext() //@TODO remove and replace with cert  /-/SECURITY/-/
                     .build()
         }

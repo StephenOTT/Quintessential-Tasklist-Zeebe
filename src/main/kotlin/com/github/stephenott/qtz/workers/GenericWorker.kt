@@ -1,7 +1,6 @@
-package com.github.stephenott.qtz.executors
+package com.github.stephenott.qtz.workers
 
 import com.github.stephenott.qtz.tasks.domain.ZeebeVariables
-import com.github.stephenott.qtz.tasks.worker.*
 import com.github.stephenott.qtz.zeebe.management.ZeebeClientConfiguration
 import io.reactivex.Completable
 import io.reactivex.Flowable

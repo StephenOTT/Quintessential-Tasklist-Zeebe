@@ -1,18 +1,7 @@
-package com.github.stephenott.qtz.tasks.worker
+package com.github.stephenott.qtz.workers.usertask
 
-import com.github.stephenott.qtz.executors.GenericWorker
-import com.github.stephenott.qtz.zeebe.management.ZeebeManagementClientConfiguration
-import io.reactivex.Completable
-import io.reactivex.Flowable
-import io.reactivex.Single
-import io.reactivex.rxkotlin.subscribeBy
-import io.reactivex.schedulers.Schedulers
-import io.zeebe.client.ZeebeClient
-import io.zeebe.client.api.command.ClientStatusException
-import io.zeebe.client.api.response.ActivatedJob
-import java.time.Duration
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
+import com.github.stephenott.qtz.workers.GenericWorker
+import com.github.stephenott.qtz.zeebe.ZeebeManagementClientConfiguration
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -41,7 +30,7 @@ class UserTaskZeebeWorker() {
         return worker
     }
 
-    fun getWorker(): GenericWorker{
+    fun getWorker(): GenericWorker {
         return worker
     }
 

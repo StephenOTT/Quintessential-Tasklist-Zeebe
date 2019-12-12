@@ -1,4 +1,4 @@
-package com.github.stephenott.qtz.executors
+package com.github.stephenott.qtz.workers
 
 import com.github.stephenott.qtz.tasks.domain.ZeebeVariables
 import io.reactivex.Single
