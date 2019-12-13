@@ -45,5 +45,5 @@ userTask:
 
 executors:
   python:
-    enabled: true
+    enabled: false
     scriptFolder: "./python-scripts"
