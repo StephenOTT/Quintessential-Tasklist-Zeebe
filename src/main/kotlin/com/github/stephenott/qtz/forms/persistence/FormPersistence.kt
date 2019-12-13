@@ -28,9 +28,6 @@ interface FormSchemaRepository : ReactiveStreamsCrudRepository<FormSchemaEntity,
     fun findByForm(form: FormEntity, pageable: Pageable): Single<Page<FormSchemaEntity>>
 }
 
-//@Introspected
-//data class SchemaDTO(var schema: FormSchema? = null)
-
 
 @Entity
 data class FormEntity(
