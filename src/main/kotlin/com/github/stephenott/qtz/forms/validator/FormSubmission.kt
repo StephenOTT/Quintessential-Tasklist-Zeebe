@@ -16,12 +16,12 @@ import io.reactivex.Single
 class FormSubmissionController(private val formValidatorServiceClient: FormValidatorServiceClient) : FormSubmissionOperations {
 
     @Post(value = "/submit")
-    override fun submit(submission: Single<FormSubmission>): Single<HttpResponse<FormSubmission>> {
+    override fun submit(@Body submission: Single<FormSubmission>): Single<HttpResponse<FormSubmission>> {
         return submission.map { HttpResponse.ok(it) }
     }
 
     @Post(value = "/validate")
-    override fun validate(submission: Single<FormSubmission>): Single<HttpResponse<ValidationResponseValid>> {
+    override fun validate(@Body submission: Single<FormSubmission>): Single<HttpResponse<Map<String, Any?>>> {
         return formValidatorServiceClient.validate(submission)
                 .onErrorResumeNext {
                     // @TODO Can eventually be replaced once micronaut-core fixes a issue where the response body is not passed to @Error handler when it catches the HttpClientResponseException
@@ -36,7 +36,7 @@ class FormSubmissionController(private val formValidatorServiceClient: FormValid
                         Single.error(IllegalStateException("Unexpected Error received from Form Validation request.", it))
                     }
                 }.map {
-                    HttpResponse.ok(it.body()!!)
+                    HttpResponse.ok(it.body()!!.processed_submission)
                 }
     }
 
@@ -48,9 +48,9 @@ class FormSubmissionController(private val formValidatorServiceClient: FormValid
 
 @Validated
 interface FormSubmissionOperations {
-    fun submit(@Body submission: Single<FormSubmission>): Single<HttpResponse<FormSubmission>>
+    fun submit(submission: Single<FormSubmission>): Single<HttpResponse<FormSubmission>>
 
-    fun validate(@Body submission: Single<FormSubmission>): Single<HttpResponse<ValidationResponseValid>>
+    fun validate(submission: Single<FormSubmission>): Single<HttpResponse<Map<String, Any?>>>
 }
 
 //@Introspected
@@ -60,7 +60,7 @@ data class FormSubmission(
 
 //@Introspected
 data class FormSubmissionData(
-        val data: Map<String, Any>,
-        val metadata: Map<String, Any>?) {}
+        val data: Map<String, Any?>,
+        val metadata: Map<String, Any?>?) {}
 
 class FormValidationException(val responseBody: ValidationResponseInvalid) : RuntimeException("Form Validation Exception") {}

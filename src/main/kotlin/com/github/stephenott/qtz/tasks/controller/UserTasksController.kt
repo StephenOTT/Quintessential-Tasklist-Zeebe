@@ -3,6 +3,7 @@ package com.github.stephenott.qtz.tasks.controller
 import com.github.stephenott.qtz.forms.FormSchema
 import com.github.stephenott.qtz.forms.persistence.FormEntity
 import com.github.stephenott.qtz.forms.persistence.FormSchemaRepository
+import com.github.stephenott.qtz.forms.validator.FormSubmissionData
 import com.github.stephenott.qtz.tasks.domain.UserTaskEntity
 import com.github.stephenott.qtz.tasks.domain.UserTaskMetadata
 import com.github.stephenott.qtz.tasks.domain.UserTaskState
@@ -82,6 +83,18 @@ open class UserTasksController() : UserTasksControllerOperations {
     override fun completeTask(taskId: UUID, @Body variables: Single<ZeebeVariables>): Single<HttpResponse<UserTaskEntity>> {
         return variables.flatMap { vars ->
             userTasksService.completeTask(taskId, vars)
+        }.doOnError {
+            println("Error occurred when trying to complete task ${taskId}: ${it.message}")
+            it.printStackTrace()
+        }.map {
+            HttpResponse.ok(it)
+        }
+    }
+
+    @Post("/{taskId}/submit")
+    override fun submitTask(taskId: UUID, @Body submission: Single<FormSubmissionData>): Single<HttpResponse<UserTaskEntity>> {
+        return submission.flatMap {
+            userTasksService.submitTask(taskId, it)
         }.map {
             HttpResponse.ok(it)
         }
@@ -95,6 +108,7 @@ open class UserTasksController() : UserTasksControllerOperations {
             }
         }
     }
+
 }
 
 interface UserTasksControllerOperations {
@@ -112,6 +126,8 @@ interface UserTasksControllerOperations {
     fun getTaskForm(taskId: UUID): Single<HttpResponse<FormSchema>>
 
     fun completeTask(taskId: UUID, variables: Single<ZeebeVariables>): Single<HttpResponse<UserTaskEntity>>
+
+    fun submitTask(taskId: UUID, submission: Single<FormSubmissionData>): Single<HttpResponse<UserTaskEntity>>
 
     fun createCustomTask(taskId: UUID, task: Single<CreateCustomTaskRequest>): Single<HttpResponse<UserTaskEntity>>
 }

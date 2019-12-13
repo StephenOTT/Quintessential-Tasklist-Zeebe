@@ -1,8 +1,11 @@
 package com.github.stephenott.qtz.tasks.service
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import com.github.stephenott.qtz.forms.FormSchema
 import com.github.stephenott.qtz.forms.persistence.FormEntity
+import com.github.stephenott.qtz.forms.persistence.FormRepository
 import com.github.stephenott.qtz.forms.persistence.FormSchemaRepository
+import com.github.stephenott.qtz.forms.validator.*
 import com.github.stephenott.qtz.tasks.domain.UserTaskEntity
 import com.github.stephenott.qtz.tasks.domain.UserTaskMetadata
 import com.github.stephenott.qtz.tasks.domain.UserTaskState
@@ -11,10 +14,9 @@ import com.github.stephenott.qtz.tasks.repository.UserTasksRepository
 import com.github.stephenott.qtz.zeebe.management.repository.ZeebeManagementRepository
 import io.micronaut.data.model.Pageable
 import io.micronaut.data.model.Sort
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.reactivex.Completable
 import io.reactivex.Single
-import io.reactivex.rxkotlin.subscribeBy
-import io.reactivex.schedulers.Schedulers
 import java.time.Instant
 import java.util.*
 import javax.inject.Inject
@@ -30,11 +32,13 @@ class UserTasksService() {
     lateinit var formSchemaRepository: FormSchemaRepository
 
     @Inject
+    lateinit var formRepository: FormRepository
+
+    @Inject
     lateinit var zeebeManagementRepository: ZeebeManagementRepository
 
-//    fun createTaskZeebe(){
-//
-//    }
+    @Inject
+    lateinit var formValidatorService: FormValidatorServiceClient
 
     fun createCustomTask(taskId: UUID, task: CreateCustomTaskRequest): Single<UserTaskEntity> {
         return Single.just(task).map {
@@ -55,8 +59,8 @@ class UserTasksService() {
         }
     }
 
-    fun updateTask(entity: UserTaskEntity):Single<UserTaskEntity> {
-        requireNotNull(entity.taskId, lazyMessage = {"taskId cannot be null when updating a User Task."})
+    fun updateTask(entity: UserTaskEntity): Single<UserTaskEntity> {
+        requireNotNull(entity.taskId, lazyMessage = { "taskId cannot be null when updating a User Task." })
         return userTasksRepository.update(entity)
     }
 
@@ -64,32 +68,105 @@ class UserTasksService() {
         return userTasksRepository.deleteById(taskId)
     }
 
+    /**
+     * An Administrative endpoint that lets you submit the data directly into the UserTask DB and Zeebe without any Form Validation
+     */
     fun completeTask(taskId: UUID, variables: ZeebeVariables): Single<UserTaskEntity> {
-        return Single.just(variables).flatMap { vars ->
-            userTasksRepository.findById(taskId)
-                    .flatMapSingle { task ->
-                        require(task.state != UserTaskState.COMPLETED, lazyMessage = { "User Task is already completed." })
-                        task.completeVariables = vars
-                        task.state = UserTaskState.COMPLETED
-                        task.completedAt = Instant.now()
-                        //@TODO review if this should be sent into another .map{} :
-                        reportCompletionToZeebe(task.zeebeJobKey!!, vars)
-                                .subscribeOn(Schedulers.io()).subscribe()
-
-                        userTasksRepository.update(task)
-                                .onErrorResumeNext {
-                                    Single.error(it)
-                                }
-
-                    }.onErrorResumeNext {
-                        Single.error(it) // @TODO add better error message
-                    }
-        }
+        return userTasksRepository.findById(taskId)
+                .map { task ->
+                    require(task.state != UserTaskState.COMPLETED, lazyMessage = { "User Task is already completed." })
+                    task.completeVariables = variables
+                    task.state = UserTaskState.COMPLETED
+                    task.completedAt = Instant.now()
+                    task
+                    //@TODO review if this should be sent into another .map{} :
+                }.flatMapSingle { task ->
+                    reportCompletionToZeebe(task.zeebeJobKey!!, variables).toSingleDefault(task)
+                }.flatMap { task ->
+                    userTasksRepository.update(task)
+                            .onErrorResumeNext {
+                                Single.error(it) //@TODO add better error handling
+                            }
+                }
     }
 
-    fun assignTask(taskId: UUID, assignee: AssignTaskRequest): Single<UserTaskEntity> {
+    /**
+     * Full flow of UserTask and Form Validation and Zebee Completion.
+     * The typical function used for submiting completed User Tasks.
+     */
+    fun submitTask(taskId: UUID, submissionVariables: FormSubmissionData): Single<UserTaskEntity> {
+        return userTasksRepository.findById(taskId)
+                .map { task ->
+                    //Get User Task Entity and make some updates
+                    require(task.state != UserTaskState.COMPLETED, lazyMessage = { "User Task is already completed." })
+
+                    task.state = UserTaskState.COMPLETED
+                    task.completedAt = Instant.now()
+
+                    SubmitTaskRequest(task).apply {
+                        formSubmissionData = submissionVariables
+                    }
+
+                }.flatMapSingle { submitTaskRequest ->
+                    // Get the Form Schema for the task
+                    getMostRecentTaskForm(submitTaskRequest.userTaskEntity.taskId!!)
+                            .map { schema ->
+                                submitTaskRequest.apply {
+                                    formSchema = schema
+                                }
+                            }
+                }.flatMap { submitTaskRequest ->
+                    // Validate the submission against the Schema
+                    formValidatorService.validate(Single.just(FormSubmission(submitTaskRequest.formSchema!!, submitTaskRequest.formSubmissionData!!)))
+                            .map { validatorResponse ->
+                                submitTaskRequest.apply {
+                                    val processedSubmission = validatorResponse.body()!!.processed_submission
+                                    userTaskEntity.completeVariables = ZeebeVariables(variables = mapOf(
+                                            Pair("${userTaskEntity.zeebeElementId!!}_task_submission", mapOf(
+                                                    Pair("submission", processedSubmission),
+                                                    Pair("formKey", userTaskEntity.formKey!!)))))
+
+                                    validFormResponse = processedSubmission
+                                }
+                            }.onErrorResumeNext {
+                                // @TODO Can eventually be replaced once micronaut-core fixes a issue where the response body is not passed to @Error handler when it catches the HttpClientResponseException
+                                if (it is HttpClientResponseException) {
+                                    val body = it.response.getBody(ValidationResponseInvalid::class.java)
+                                    if (body.isPresent) {
+                                        Single.error(FormValidationException(body.get()))
+                                    } else {
+                                        Single.error(IllegalStateException("Invalid Response Received", it))
+                                    }
+                                } else {
+                                    Single.error(IllegalStateException("Unexpected Error received from Form Validation request.", it))
+                                }
+                            }
+                }.flatMap { submitTaskRequest ->
+                    //Report Completion to Zeebe
+                    reportCompletionToZeebe(submitTaskRequest.userTaskEntity.zeebeJobKey!!, submitTaskRequest.userTaskEntity.completeVariables!!)
+                            .toSingleDefault(submitTaskRequest)
+                            .doOnSuccess {
+                                println("User Task ${submitTaskRequest.userTaskEntity.taskId!!} has been reported to Zeebe as Job Complete.")
+                            }
+                    //@TODO future consideration: The CompletedAt timestamp for the UserTaskEntity is from the original submission and not the Zeebe job completion.
+                }.flatMap { submitTaskRequest ->
+                    // Submit final result to DB
+                    userTasksRepository.update(submitTaskRequest.userTaskEntity)
+                            .onErrorResumeNext {
+                                Single.error(it) //@TODO add better error handling
+                            }
+                }
+    }
+
+    fun assignTask(taskId: UUID, assignee: AssignTaskRequest, requireUnassigned: Boolean = false): Single<UserTaskEntity> {
         return userTasksRepository.findById(taskId).flatMapSingle { ut ->
+
+            if (requireUnassigned && ut.assignee != null) {
+                throw IllegalStateException("Task is already assigned.")
+            }
+
             ut.assignee = assignee.assignee
+
             userTasksRepository.update(ut)
                     .onErrorResumeNext { e ->
                         Single.error(e) // @TODO add update error handling
@@ -99,8 +176,26 @@ class UserTasksService() {
         }
     }
 
+    fun removeAssigneeFromTask(taskId: UUID, requestingUserId: String): Single<UserTaskEntity> {
+        return userTasksRepository.findById(taskId).flatMapSingle { ut ->
+
+            if (ut.assignee != requestingUserId) {
+                throw IllegalStateException("Task is not assigned to requesting user.")
+            }
+
+            ut.assignee = null
+
+            userTasksRepository.update(ut)
+                    .onErrorResumeNext { e ->
+                        Single.error(e) //@TODO
+                    }
+        }.onErrorResumeNext { e ->
+            Single.error(e) //@TODO
+        }
+    }
+
     private fun reportCompletionToZeebe(jobKey: Long, completionVariables: ZeebeVariables): Completable {
-            return zeebeManagementRepository.completeJob(jobKey, completionVariables)
+        return zeebeManagementRepository.completeJob(jobKey, completionVariables)
     }
 
     private fun reportFailureToZeebe(jobKey: Long, errorMessage: String, remainingRetries: Int = 0): Completable {
@@ -108,29 +203,39 @@ class UserTasksService() {
     }
 
     fun getMostRecentTaskForm(taskId: UUID): Single<FormSchema> {
-        //@TODO consider adding a wrapper object that has metadata such as formKey
-        return userTasksRepository.findById(taskId)
-                .flatMapSingle { _ ->
-                    val formEntity = FormEntity(id = taskId)
-                    val pageConfig = Pageable.from(0, 1, Sort.of(Sort.Order.desc("version")))
-
-                    formSchemaRepository.findByForm(formEntity, pageConfig)
-                            .onErrorResumeNext {
-                                Single.error(it) //@TODO add error for schema was not found
-
-                            }.map { page ->
-                                check(page.numberOfElements == 1, lazyMessage = { "Number of elements returned expected not equal to 1" })
-                                page.content[0].schema!!
-                            }
-                }
+        return userTasksRepository.findById(taskId).flatMapSingle {
+            formRepository.findByFormKey(it.formKey!!)
+        }.flatMap { formEntity ->
+            formSchemaRepository.findByForm(FormEntity(id = formEntity.id!!),
+                    Pageable.from(0, 1, Sort.of(Sort.Order.desc("version"))))
+                    .map {
+                        require(it.numberOfElements == 1,
+                                lazyMessage = { "Could not find a form schema for the formKey of the provided Task ID." })
+                        it.content[0].schema!!
+                                ?: throw IllegalStateException("Did not find any schema for the provided formKey")
+                    }
+        }
     }
-
 }
 
 
 data class AssignTaskRequest(
         val assignee: String
 )
+
+data class SubmitTaskRequest(
+        @JsonIgnore var userTaskEntity: UserTaskEntity
+) {
+    @JsonIgnore
+    var formSchema: FormSchema? = null
+
+    @JsonIgnore
+    var formSubmissionData: FormSubmissionData? = null
+
+    @JsonIgnore
+    var validFormResponse: Map<String, Any?>? = null
+
+}
 
 data class CreateCustomTaskRequest(
         val title: String,

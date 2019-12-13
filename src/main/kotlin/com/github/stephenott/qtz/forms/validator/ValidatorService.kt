@@ -25,7 +25,7 @@ interface FormValidatorServiceClient {
 
 }
 
-data class ValidationResponseValid(@JsonUnwrapped val processed_submission: Map<String, Any>)
+data class ValidationResponseValid(val processed_submission: Map<String, Any?>)
 
 data class ValidationResponseInvalid(@get:JsonProperty("isJoi") @param:JsonProperty("isJoi") val isJoi: Boolean,
                                      val name: String,
