@@ -1,6 +1,7 @@
 package com.github.stephenott.qtz.forms.persistence
 
 import com.github.stephenott.qtz.forms.FormSchema
+import com.github.stephenott.qtz.tasks.service.UserTasksService
 import io.micronaut.data.model.Pageable
 import io.micronaut.data.model.Sort
 import io.micronaut.http.HttpResponse
@@ -57,7 +58,9 @@ class FormStorageController() : FormStorageOperations {
             return Single.fromPublisher(formRepository.findById(uuid)).map { HttpResponse.ok(listOf(it)) }
         }
         formKey?.let { key ->
-            return formRepository.findByFormKey(key).map { HttpResponse.ok(listOf(it)) }
+            return formRepository.findByFormKey(key)
+                    .switchIfEmpty(Single.error(UserTasksService.FormKeyNotFoundException(key)))
+                    .map { HttpResponse.ok(listOf(it)) }
         }
         return formRepository.findAll(pageable ?: Pageable.from(0, 10)) //@TODO Refactor to a configurable default
                 .map {

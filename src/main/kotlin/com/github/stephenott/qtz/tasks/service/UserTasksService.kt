@@ -90,12 +90,19 @@ class UserTasksService() {
                 }
     }
 
+    class UserTaskNotFoundException(val taskId: UUID) : RuntimeException("Provided Task ID $taskId could not be found") {}
+    class FormKeyNotFoundException(val formKey: String) : RuntimeException("Provided formKey $formKey could not be found") {}
+    class NoSchemasFoundForFormKeyException(val formKey: String) : RuntimeException("Provided formKey $formKey could not be found") {}
+    class UnableToCompleteZeebeJobException(val taskId: UUID, zeebeJobKey: Long) : RuntimeException("Unable to complete Zeebe job $zeebeJobKey for task $taskId") {}
+    class UnableToUpdateUserTaskWithCompletionException(val taskId: UUID) : RuntimeException("Unable to update user task $taskId to completed state.")
+
     /**
      * Full flow of UserTask and Form Validation and Zebee Completion.
      * The typical function used for submiting completed User Tasks.
      */
     fun submitTask(taskId: UUID, submissionVariables: FormSubmissionData): Single<UserTaskEntity> {
         return userTasksRepository.findById(taskId)
+                .switchIfEmpty(Single.error(UserTaskNotFoundException(taskId)))
                 .map { task ->
                     //Get User Task Entity and make some updates
                     require(task.state != UserTaskState.COMPLETED, lazyMessage = { "User Task is already completed." })
@@ -107,7 +114,7 @@ class UserTasksService() {
                         formSubmissionData = submissionVariables
                     }
 
-                }.flatMapSingle { submitTaskRequest ->
+                }.flatMap { submitTaskRequest ->
                     // Get the Form Schema for the task
                     getMostRecentTaskForm(submitTaskRequest.userTaskEntity.taskId!!)
                             .map { schema ->
@@ -144,7 +151,9 @@ class UserTasksService() {
                 }.flatMap { submitTaskRequest ->
                     //Report Completion to Zeebe
                     reportCompletionToZeebe(submitTaskRequest.userTaskEntity.zeebeJobKey!!, submitTaskRequest.userTaskEntity.completeVariables!!)
-                            .toSingleDefault(submitTaskRequest)
+                            .onErrorResumeNext {
+                                Completable.error(UnableToCompleteZeebeJobException(submitTaskRequest.userTaskEntity.taskId!!, submitTaskRequest.userTaskEntity.zeebeJobKey!!))
+                            }.toSingleDefault(submitTaskRequest)
                             .doOnSuccess {
                                 println("User Task ${submitTaskRequest.userTaskEntity.taskId!!} has been reported to Zeebe as Job Complete.")
                             }
@@ -153,7 +162,7 @@ class UserTasksService() {
                     // Submit final result to DB
                     userTasksRepository.update(submitTaskRequest.userTaskEntity)
                             .onErrorResumeNext {
-                                Single.error(it) //@TODO add better error handling
+                                Single.error(UnableToUpdateUserTaskWithCompletionException(submitTaskRequest.userTaskEntity.taskId!!)) //@TODO add better error handling
                             }
                 }
     }
@@ -203,18 +212,24 @@ class UserTasksService() {
     }
 
     fun getMostRecentTaskForm(taskId: UUID): Single<FormSchema> {
-        return userTasksRepository.findById(taskId).flatMapSingle {
-            formRepository.findByFormKey(it.formKey!!)
-        }.flatMap { formEntity ->
-            formSchemaRepository.findByForm(FormEntity(id = formEntity.id!!),
-                    Pageable.from(0, 1, Sort.of(Sort.Order.desc("version"))))
-                    .map {
-                        require(it.numberOfElements == 1,
-                                lazyMessage = { "Could not find a form schema for the formKey of the provided Task ID." })
-                        it.content[0].schema!!
-                                ?: throw IllegalStateException("Did not find any schema for the provided formKey")
-                    }
-        }
+        return userTasksRepository.findById(taskId)
+                .switchIfEmpty(Single.error(UserTaskNotFoundException(taskId)))
+                .flatMap {
+                    formRepository.findByFormKey(it.formKey!!)
+                            .switchIfEmpty(Single.error(FormKeyNotFoundException(it.formKey!!)))
+                }.flatMap { formEntity ->
+                    formSchemaRepository.findByForm(FormEntity(id = formEntity.id!!),
+                            Pageable.from(0, 1, Sort.of(Sort.Order.desc("version"))))
+                            .map {
+                                if (it.isEmpty){
+                                    throw NoSchemasFoundForFormKeyException(formEntity.formKey!!)
+                                } else {
+                                    require(it.numberOfElements == 1,
+                                            lazyMessage = { "Could not find a form schema for the formKey of the provided Task ID." })
+                                    it.content[0].schema!!
+                                }
+                            }
+                }
     }
 }
 

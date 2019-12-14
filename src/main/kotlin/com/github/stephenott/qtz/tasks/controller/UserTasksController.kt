@@ -4,6 +4,8 @@ import com.github.stephenott.qtz.forms.FormSchema
 import com.github.stephenott.qtz.forms.persistence.FormEntity
 import com.github.stephenott.qtz.forms.persistence.FormSchemaRepository
 import com.github.stephenott.qtz.forms.validator.FormSubmissionData
+import com.github.stephenott.qtz.forms.validator.FormValidationException
+import com.github.stephenott.qtz.forms.validator.ValidationResponseInvalid
 import com.github.stephenott.qtz.tasks.domain.UserTaskEntity
 import com.github.stephenott.qtz.tasks.domain.UserTaskMetadata
 import com.github.stephenott.qtz.tasks.domain.UserTaskState
@@ -14,9 +16,11 @@ import com.github.stephenott.qtz.tasks.service.CreateCustomTaskRequest
 import com.github.stephenott.qtz.tasks.service.UserTasksService
 import io.micronaut.data.model.Pageable
 import io.micronaut.data.model.Sort
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.reactivex.Maybe
@@ -107,6 +111,11 @@ open class UserTasksController() : UserTasksControllerOperations {
                 HttpResponse.created(entity)
             }
         }
+    }
+
+    @Error
+    fun formValidationError(request: HttpRequest<*>, exception: FormValidationException): HttpResponse<ValidationResponseInvalid> {
+        return HttpResponse.badRequest(exception.responseBody)
     }
 
 }

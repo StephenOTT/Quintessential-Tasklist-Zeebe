@@ -8,6 +8,7 @@ import io.micronaut.data.annotation.Repository
 import io.micronaut.data.model.Page
 import io.micronaut.data.model.Pageable
 import io.micronaut.data.repository.reactive.ReactiveStreamsCrudRepository
+import io.reactivex.Maybe
 import io.reactivex.Single
 import java.time.Instant
 import java.util.*
@@ -17,7 +18,7 @@ import javax.persistence.*
 @Repository
 interface FormRepository : ReactiveStreamsCrudRepository<FormEntity, UUID> {
 
-    fun findByFormKey(formKey: String): Single<FormEntity>
+    fun findByFormKey(formKey: String): Maybe<FormEntity>
 
     fun findAll(pageable: Pageable): Single<Page<FormEntity>>
 }
