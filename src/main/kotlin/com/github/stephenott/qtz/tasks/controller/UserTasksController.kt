@@ -1,31 +1,21 @@
 package com.github.stephenott.qtz.tasks.controller
 
-import com.github.stephenott.qtz.forms.FormSchema
-import com.github.stephenott.qtz.forms.persistence.FormEntity
-import com.github.stephenott.qtz.forms.persistence.FormSchemaRepository
-import com.github.stephenott.qtz.forms.validator.FormSubmissionData
-import com.github.stephenott.qtz.forms.validator.FormValidationException
-import com.github.stephenott.qtz.forms.validator.ValidationResponseInvalid
+import com.github.stephenott.qtz.forms.domain.FormSchema
+import com.github.stephenott.qtz.forms.validator.domain.FormSubmissionData
+import com.github.stephenott.qtz.forms.validator.exception.FormValidationException
+import com.github.stephenott.qtz.forms.validator.client.ValidationResponseInvalid
 import com.github.stephenott.qtz.tasks.domain.UserTaskEntity
-import com.github.stephenott.qtz.tasks.domain.UserTaskMetadata
-import com.github.stephenott.qtz.tasks.domain.UserTaskState
 import com.github.stephenott.qtz.tasks.domain.ZeebeVariables
 import com.github.stephenott.qtz.tasks.repository.UserTasksRepository
 import com.github.stephenott.qtz.tasks.service.AssignTaskRequest
 import com.github.stephenott.qtz.tasks.service.CreateCustomTaskRequest
 import com.github.stephenott.qtz.tasks.service.UserTasksService
 import io.micronaut.data.model.Pageable
-import io.micronaut.data.model.Sort
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
-import io.micronaut.http.annotation.Body
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Error
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.*
 import io.reactivex.Maybe
 import io.reactivex.Single
-import java.time.Instant
 import java.util.*
 import javax.inject.Inject
 

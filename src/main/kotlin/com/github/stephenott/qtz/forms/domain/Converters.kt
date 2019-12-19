@@ -1,9 +1,8 @@
-package com.github.stephenott.qtz.forms.persistence
+package com.github.stephenott.qtz.forms.domain
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
-import com.github.stephenott.qtz.forms.FormSchema
 import javax.persistence.AttributeConverter
 import javax.persistence.Converter
 

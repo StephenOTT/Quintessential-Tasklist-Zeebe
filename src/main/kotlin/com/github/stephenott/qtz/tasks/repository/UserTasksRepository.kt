@@ -8,7 +8,6 @@ import io.micronaut.data.model.Pageable
 import io.micronaut.data.repository.reactive.RxJavaCrudRepository
 import io.reactivex.Single
 import java.util.*
-import javax.inject.Singleton
 
 @Repository
 interface UserTasksRepository: RxJavaCrudRepository<UserTaskEntity, UUID>{

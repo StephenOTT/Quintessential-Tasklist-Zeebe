@@ -1,4 +1,4 @@
-package com.github.stephenott.qtz.forms
+package com.github.stephenott.qtz.forms.domain
 
 data class FormSchema(
         val display:String,

@@ -29,11 +29,10 @@ flyway:
     default:
       locations: classpath:databasemigrations
 
-
 formValidatorService:
   host: http://localhost:8081
 
-zeebe:
+orchestrator:
   management:
     client:
       brokerContactPoint: localhost:26500

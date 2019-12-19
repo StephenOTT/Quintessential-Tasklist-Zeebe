@@ -1,11 +1,11 @@
 package com.github.stephenott.qtz.workers.usertask
 
-import com.github.stephenott.qtz.workers.JobProcessor
-import com.github.stephenott.qtz.workers.JobResult
 import com.github.stephenott.qtz.tasks.domain.UserTaskEntity
 import com.github.stephenott.qtz.tasks.domain.UserTaskState
 import com.github.stephenott.qtz.tasks.domain.ZeebeVariables
 import com.github.stephenott.qtz.tasks.repository.UserTasksRepository
+import com.github.stephenott.qtz.workers.JobProcessor
+import com.github.stephenott.qtz.workers.JobResult
 import com.github.stephenott.qtz.zeebe.ZeebeManagementClientConfiguration
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers

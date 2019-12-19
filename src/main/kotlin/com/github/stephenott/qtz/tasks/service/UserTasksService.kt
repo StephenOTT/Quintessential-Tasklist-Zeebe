@@ -1,11 +1,15 @@
 package com.github.stephenott.qtz.tasks.service
 
 import com.fasterxml.jackson.annotation.JsonIgnore
-import com.github.stephenott.qtz.forms.FormSchema
+import com.github.stephenott.qtz.forms.domain.FormSchema
 import com.github.stephenott.qtz.forms.persistence.FormEntity
 import com.github.stephenott.qtz.forms.persistence.FormRepository
 import com.github.stephenott.qtz.forms.persistence.FormSchemaRepository
-import com.github.stephenott.qtz.forms.validator.*
+import com.github.stephenott.qtz.forms.validator.client.FormValidatorServiceClient
+import com.github.stephenott.qtz.forms.validator.client.ValidationResponseInvalid
+import com.github.stephenott.qtz.forms.validator.domain.FormSubmission
+import com.github.stephenott.qtz.forms.validator.domain.FormSubmissionData
+import com.github.stephenott.qtz.forms.validator.exception.FormValidationException
 import com.github.stephenott.qtz.tasks.domain.UserTaskEntity
 import com.github.stephenott.qtz.tasks.domain.UserTaskMetadata
 import com.github.stephenott.qtz.tasks.domain.UserTaskState

@@ -1,9 +1,6 @@
 package com.github.stephenott.qtz.workers.python
 
 import com.github.stephenott.qtz.workers.GenericWorker
-import com.github.stephenott.qtz.workers.python.PythonExecutorFailedJobProcessor
-import com.github.stephenott.qtz.workers.python.PythonExecutorJobProcessor
-import com.github.stephenott.qtz.workers.python.PythonExecutorWorkerConfiguration
 import com.github.stephenott.qtz.zeebe.ZeebeManagementClientConfiguration
 import javax.inject.Inject
 import javax.inject.Singleton

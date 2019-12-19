@@ -1,7 +1,7 @@
 package com.github.stephenott.qtz.zeebe.management.controler
 
-import com.github.stephenott.qtz.workers.python.PythonExecutorZeebeWorker
 import com.github.stephenott.qtz.tasks.domain.ZeebeVariables
+import com.github.stephenott.qtz.workers.python.PythonExecutorZeebeWorker
 import com.github.stephenott.qtz.workers.usertask.UserTaskZeebeWorker
 import com.github.stephenott.qtz.zeebe.ZeebeManagementClientConfiguration
 import com.github.stephenott.qtz.zeebe.management.repository.ZeebeManagementRepository
@@ -12,6 +12,7 @@ import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.client.HttpClientConfiguration
 import io.micronaut.http.multipart.StreamingFileUpload
 import io.reactivex.Single
 import io.zeebe.client.api.response.WorkflowInstanceEvent

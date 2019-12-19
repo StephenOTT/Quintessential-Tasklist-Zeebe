@@ -1,14 +1,11 @@
 package com.github.stephenott.qtz.zeebe
 
-import com.github.stephenott.qtz.zeebe.ZeebeClientConfiguration
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.annotation.Context
-import io.micronaut.context.annotation.Value
 import java.time.Duration
 import java.util.*
-import javax.validation.constraints.NotBlank
 
-@ConfigurationProperties("zeebe.management.client")
+@ConfigurationProperties("orchestrator.management.client")
 @Context
 class ZeebeManagementClientConfiguration: ZeebeClientConfiguration {
 

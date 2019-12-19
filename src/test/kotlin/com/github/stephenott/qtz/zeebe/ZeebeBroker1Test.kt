@@ -1,15 +1,12 @@
 package com.github.stephenott.qtz.zeebe
 
 import io.kotlintest.Spec
-import io.kotlintest.shouldNotBe
 import io.kotlintest.specs.StringSpec
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.test.annotation.MicronautTest
-import io.zeebe.client.ZeebeClient
 import java.io.File
-import java.io.FileWriter
 
 @MicronautTest
 class ZeebeBroker1Test : StringSpec({

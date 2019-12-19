@@ -1,7 +1,5 @@
 package com.github.stephenott.qtz.workers.usertask
 
-import com.github.stephenott.qtz.workers.usertask.UserTaskZeebeWorker
-import com.github.stephenott.qtz.workers.usertask.ZeebeUserTaskWorkerConfiguration
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.runtime.server.event.ServerStartupEvent
 import io.reactivex.schedulers.Schedulers

@@ -14,6 +14,7 @@ import java.time.Duration
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
+
 class GenericWorker(
         private val jobProcessor: JobProcessor,
         private val jobFailedProcessor: JobFailedProcessor,
