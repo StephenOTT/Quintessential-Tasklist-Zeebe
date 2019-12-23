@@ -2,9 +2,9 @@ package com.github.stephenott.qtz.tasks.service
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.github.stephenott.qtz.forms.domain.FormSchema
-import com.github.stephenott.qtz.forms.persistence.FormEntity
-import com.github.stephenott.qtz.forms.persistence.FormRepository
-import com.github.stephenott.qtz.forms.persistence.FormSchemaRepository
+import com.github.stephenott.qtz.forms.domain.FormEntity
+import com.github.stephenott.qtz.forms.repository.FormsRepository
+import com.github.stephenott.qtz.forms.repository.FormSchemasRepository
 import com.github.stephenott.qtz.forms.validator.client.FormValidatorServiceClient
 import com.github.stephenott.qtz.forms.validator.client.ValidationResponseInvalid
 import com.github.stephenott.qtz.forms.validator.domain.FormSubmission
@@ -33,10 +33,10 @@ class UserTasksService() {
     lateinit var userTasksRepository: UserTasksRepository
 
     @Inject
-    lateinit var formSchemaRepository: FormSchemaRepository
+    lateinit var formSchemaRepository: FormSchemasRepository
 
     @Inject
-    lateinit var formRepository: FormRepository
+    lateinit var formRepository: FormsRepository
 
     @Inject
     lateinit var zeebeManagementRepository: ZeebeManagementRepository
