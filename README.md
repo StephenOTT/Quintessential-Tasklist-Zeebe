@@ -113,6 +113,12 @@ Formatting rules enable you to prevent common errors in formatting of BPMN.
 1. Gateways labels end in "?"
 1. No Expressions
 1. Double sequence flows
+1. Sub-Process Names
+1. Loop Characteristics naming
+1. Start Timer names
+1. Message Start Names
+1. End Event Names
+1. Intermediate Event Names
 1. .. More?
 
 
@@ -129,3 +135,4 @@ Formatting rules enable you to prevent common errors in formatting of BPMN.
 1. Add Timer rules to prevent certain spectrum of timer durations / cycles
 1. Add targeting based on BPMN Process Key
 1. Add special negating rule for Task Types and Correlation Keys
+1. Add Allowed Call Activity Process IDs: Rule to ensure only specific Process IDs can be called through the Modeler.
