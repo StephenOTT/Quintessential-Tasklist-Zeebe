@@ -37,9 +37,42 @@ orchestrator:
     client:
       brokerContactPoint: localhost:26500
       longPollTimeout: 30s
+  workflow-linter:
+    rules:
+      global-rules:
+        enable: false
+        description: Global Restrictions for Service Task Types
+        elementTypes:
+          - ServiceTask
+        serviceTaskRule:
+          allowedTypes:
+            - some-type
+            - user-task
+
+      user-task-rule:
+        description: Specific rule for User Task Configuration of Service Tasks
+        elementTypes:
+          - ServiceTask
+        target:
+          serviceTasks:
+            types:
+              - user-task
+        headerRule:
+          requiredKeys:
+            - title
+            - candidateGroups
+            - formKey
+          allowedNonDefinedKeys: false
+          allowedDuplicateKeys: false
+          optionalKeys:
+            - priority
+            - assignee
+            - candidateUsers
+            - dueDate
+            - description
 
 userTask:
-  enabled: true
+  enabled: false
   maxBatchSize: 10
 
 executors:

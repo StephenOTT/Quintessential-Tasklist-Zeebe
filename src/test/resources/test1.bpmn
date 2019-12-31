@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_1f1elu3" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Zeebe Modeler" exporterVersion="0.6.2">
-  <bpmn:process id="Process_16i55l0" name="test1" isExecutable="true">
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_1f1elu3" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Zeebe Modeler" exporterVersion="0.8.0">
+  <bpmn:process id="Process_16i55l0" isExecutable="true">
     <bpmn:startEvent id="StartEvent_1">
       <bpmn:outgoing>SequenceFlow_1hnbx9h</bpmn:outgoing>
     </bpmn:startEvent>
@@ -8,8 +8,9 @@
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="user-task" />
         <zeebe:taskHeaders>
-          <zeebe:header key="title" value="My Custom Task" />
-          <zeebe:header key="formKey" value="some-form-key-123" />
+          <zeebe:header key="formKey" value="haha" />
+          <zeebe:header key="title" value="my title 1234" />
+          <zeebe:header key="candidateGroups" value="dog, cat" />
         </zeebe:taskHeaders>
       </bpmn:extensionElements>
       <bpmn:incoming>SequenceFlow_1hnbx9h</bpmn:incoming>
@@ -17,18 +18,42 @@
     </bpmn:serviceTask>
     <bpmn:sequenceFlow id="SequenceFlow_1hnbx9h" sourceRef="StartEvent_1" targetRef="ServiceTask_1luzsfd" />
     <bpmn:endEvent id="EndEvent_110wsp7">
-      <bpmn:incoming>SequenceFlow_0le1ghn</bpmn:incoming>
+      <bpmn:incoming>SequenceFlow_0so1ad9</bpmn:incoming>
     </bpmn:endEvent>
     <bpmn:sequenceFlow id="SequenceFlow_0m879d8" sourceRef="ServiceTask_1luzsfd" targetRef="ServiceTask_0g4yqd2" />
-    <bpmn:serviceTask id="ServiceTask_0g4yqd2" name="Task 2">
+    <bpmn:sequenceFlow id="SequenceFlow_0le1ghn" sourceRef="ServiceTask_0g4yqd2" targetRef="ExclusiveGateway_0vzq5hz" />
+    <bpmn:exclusiveGateway id="ExclusiveGateway_0vzq5hz" default="SequenceFlow_0so1ad9">
+      <bpmn:incoming>SequenceFlow_0le1ghn</bpmn:incoming>
+      <bpmn:outgoing>SequenceFlow_0so1ad9</bpmn:outgoing>
+      <bpmn:outgoing>SequenceFlow_0h49sue</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="SequenceFlow_0so1ad9" sourceRef="ExclusiveGateway_0vzq5hz" targetRef="EndEvent_110wsp7" />
+    <bpmn:sequenceFlow id="SequenceFlow_0h49sue" sourceRef="ExclusiveGateway_0vzq5hz" targetRef="Task_1y4e53o" />
+    <bpmn:endEvent id="EndEvent_00bvoi4">
+      <bpmn:incoming>SequenceFlow_1qlpxbr</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="SequenceFlow_1qlpxbr" sourceRef="Task_1y4e53o" targetRef="EndEvent_00bvoi4" />
+    <bpmn:receiveTask id="Task_1y4e53o" messageRef="Message_0nvg56a">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="222" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>SequenceFlow_0h49sue</bpmn:incoming>
+      <bpmn:outgoing>SequenceFlow_1qlpxbr</bpmn:outgoing>
+    </bpmn:receiveTask>
+    <bpmn:task id="ServiceTask_0g4yqd2" name="Task 2">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="some-type" />
       </bpmn:extensionElements>
       <bpmn:incoming>SequenceFlow_0m879d8</bpmn:incoming>
       <bpmn:outgoing>SequenceFlow_0le1ghn</bpmn:outgoing>
-    </bpmn:serviceTask>
-    <bpmn:sequenceFlow id="SequenceFlow_0le1ghn" sourceRef="ServiceTask_0g4yqd2" targetRef="EndEvent_110wsp7" />
+    </bpmn:task>
   </bpmn:process>
+  <bpmn:message id="Message_0nvg56a" name="Message_3emu1na">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="ppppp" />
+    </bpmn:extensionElements>
+  </bpmn:message>
+  <bpmn:message id="Message_0gu4gpm" />
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_16i55l0">
       <bpmndi:BPMNShape id="_BPMNShape_StartEvent_2" bpmnElement="StartEvent_1">
@@ -42,19 +67,40 @@
         <di:waypoint x="261" y="121" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNShape id="EndEvent_110wsp7_di" bpmnElement="EndEvent_110wsp7">
-        <dc:Bounds x="567" y="103" width="36" height="36" />
+        <dc:Bounds x="732" y="103" width="36" height="36" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="SequenceFlow_0m879d8_di" bpmnElement="SequenceFlow_0m879d8">
         <di:waypoint x="361" y="121" />
         <di:waypoint x="406" y="121" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNShape id="ServiceTask_0g4yqd2_di" bpmnElement="ServiceTask_0g4yqd2">
-        <dc:Bounds x="406" y="81" width="100" height="80" />
-      </bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="SequenceFlow_0le1ghn_di" bpmnElement="SequenceFlow_0le1ghn">
         <di:waypoint x="506" y="121" />
-        <di:waypoint x="567" y="121" />
+        <di:waypoint x="555" y="121" />
       </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="ExclusiveGateway_0vzq5hz_di" bpmnElement="ExclusiveGateway_0vzq5hz" isMarkerVisible="true">
+        <dc:Bounds x="555" y="96" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="SequenceFlow_0so1ad9_di" bpmnElement="SequenceFlow_0so1ad9">
+        <di:waypoint x="605" y="121" />
+        <di:waypoint x="732" y="121" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="SequenceFlow_0h49sue_di" bpmnElement="SequenceFlow_0h49sue">
+        <di:waypoint x="580" y="146" />
+        <di:waypoint x="580" y="190" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="EndEvent_00bvoi4_di" bpmnElement="EndEvent_00bvoi4">
+        <dc:Bounds x="702" y="212" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="SequenceFlow_1qlpxbr_di" bpmnElement="SequenceFlow_1qlpxbr">
+        <di:waypoint x="630" y="230" />
+        <di:waypoint x="702" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="ReceiveTask_1e5vjhg_di" bpmnElement="Task_1y4e53o">
+        <dc:Bounds x="530" y="190" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_1nhd7s0_di" bpmnElement="ServiceTask_0g4yqd2">
+        <dc:Bounds x="406" y="81" width="100" height="80" />
+      </bpmndi:BPMNShape>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>
