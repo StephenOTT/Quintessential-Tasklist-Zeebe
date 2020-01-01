@@ -1,9 +1,11 @@
 package com.github.stephenott.qtz.linter
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.*
 import io.micronaut.core.convert.ConversionContext
 import io.micronaut.core.convert.TypeConverter
 import org.camunda.bpm.model.xml.instance.ModelElementInstance
+import org.camunda.bpm.model.xml.validation.ModelElementValidator
 import java.util.*
 import javax.inject.Singleton
 import javax.validation.constraints.NotBlank
@@ -84,5 +86,53 @@ enum class ElementType: ElementTypeZeebe {
 class ElementTypeTypeConverter: TypeConverter<String, ElementType>{
     override fun convert(`object`: String, targetType: Class<ElementType>?, context: ConversionContext?): Optional<ElementType> {
         return Optional.of(ElementType.valueOf(`object`))
+    }
+}
+
+object LinterConfigurationParser{
+    fun getLintRuleBeans(applicationContext: ApplicationContext): List<LinterRule>{
+        return applicationContext.getBeansOfType(LinterRule::class.java).toList()
+    }
+
+    fun lintRulesToValidators(linterRules: List<LinterRule>): List<ModelElementValidator<out ModelElementInstance>>{
+        val myList: MutableList<ModelElementValidator<out ModelElementInstance>> = mutableListOf()
+        linterRules.forEach { lr ->
+
+            //Apply the rules for Each Element type that was provided
+            // Current assumption is that rules should be aware of what elements they apply to
+            lr.elementTypes!!.forEach { elementType ->
+                val elementClass = elementType.zeebeClass
+
+                lr.headerRule?.let { headerRule ->
+                    LinterRules.processRequiredHeadersRule(elementClass, headerRule.requiredKeys, lr.target)?.let { v ->
+                        myList.add(v)
+                    }
+
+                    if (!headerRule.allowedNonDefinedKeys){
+                        LinterRules.processOptionalHeadersRule(elementClass, headerRule.optionalKeys, headerRule.requiredKeys, lr.target)?.let { v ->
+                            myList.add(v)
+                        }
+                    }
+
+                    if (!headerRule.allowedDuplicateKeys){
+                        LinterRules.processDuplicateHeaderKeysRule(elementClass, lr.target)?.let { v ->
+                            myList.add(v)
+                        }
+                    }
+                }
+
+                lr.serviceTaskRule?.let { serviceTaskRule ->
+                    //@TODO Review need to move this rule to global space for controlling global allowed types
+                    serviceTaskRule.allowedTypes?.let { types ->
+                        LinterRules.processServiceTaskAllowedTypesListRule(elementClass, types, lr.target)?.let { v ->
+                            myList.add(v)
+                        }
+                    }
+                }
+
+            }
+
+        }
+        return myList
     }
 }

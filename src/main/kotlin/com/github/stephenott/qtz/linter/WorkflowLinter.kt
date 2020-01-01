@@ -10,8 +10,8 @@ class WorkflowLinter(file: File) {
 
     private val bpmmModelInstance: BpmnModelInstance = Bpmn.readModelFromFile(file)
 
-    fun lintWithCustomRules(rules: List<ModelElementValidator<*>>){
-        val result = bpmmModelInstance.validate(rules)
+    fun lintWithValidators(validators: List<ModelElementValidator<*>>){
+        val result = bpmmModelInstance.validate(validators)
         result.results.forEach { (model, results) ->
             println("Element ---> ${model.elementType.typeName} ${(model.takeIf { it is BaseElement } as BaseElement).id}")
             results.forEach { validationResult ->
