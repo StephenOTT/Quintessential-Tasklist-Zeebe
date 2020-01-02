@@ -29,6 +29,7 @@ class Cleaner(private val validators: List<ModelElementValidator<*>>,
                     //@TODO add support for Gateway/sequence flow support to keep configs for default
                     println(element.elementType.instanceType)
                     println((element as BaseElement).id)
+                    println("NEW ELEMENT")
                     results.filter { it.code == CLEANER_CODE }.forEach cleaners@{ eResult ->
                         val newInstance = eResult.element.modelInstance.newInstance<BaseElement>(eResult.element.elementType, (eResult.element as BaseElement).id)
 
@@ -39,6 +40,8 @@ class Cleaner(private val validators: List<ModelElementValidator<*>>,
                         if (eResult.element.elementType.instanceType.kotlin.isSubclassOf(Expression::class)) {
                             return@cleaners
                         }
+
+                        println("cat")
 
                         if (eResult.element.elementType.instanceType == Collaboration::class.java) {
                             return@cleaners
@@ -127,12 +130,17 @@ class Cleaner(private val validators: List<ModelElementValidator<*>>,
                             newInstance.setAttributeValue("name", eResult.element.getAttributeValue("name"))
                         }
 
-
+                        println("reached replacement")
                         when (element.elementType.instanceType.kotlin) {
                             SubProcess::class -> {
                                 val elements = (element as SubProcess).flowElements
                                 elements.forEach { newInstance.addChildElement(it) }
                                 element.parentElement.replaceChildElement(element, newInstance)
+                            }
+                            Message::class -> {
+                                // This ensures the Message is actually removed from the BPMN.
+                                // If you remove all instances of usage of the Message (such as on Receive Tasks and Message Catch Events), the Message element is still present in the BPMN xml.
+                                element.parentElement.removeChildElement(element)
                             }
                             else -> {
                                 element.parentElement.replaceChildElement(element, newInstance)

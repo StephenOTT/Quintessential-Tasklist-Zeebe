@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_1f1elu3" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Zeebe Modeler" exporterVersion="0.8.0">
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" id="Definitions_1f1elu3" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Zeebe Modeler" exporterVersion="0.8.0">
   <bpmn:collaboration id="Collaboration_1xisnek" isClosed="false">
     <bpmn:participant id="Participant_1e6coet" name="hahahah" processRef="Process_16i55l0" />
     <bpmn:participant id="Participant_09g5ptg" name="CAT" processRef="Process_1s0oy1z" />
@@ -20,15 +20,15 @@
         <bpmn:flowNodeRef>EndEvent_1m14ym9</bpmn:flowNodeRef>
       </bpmn:lane>
       <bpmn:lane id="Lane_1dnrkkq">
-        <bpmn:flowNodeRef>Task_05r7ocx</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_1pjpqz0</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_10ugd34</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_00znhpl</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>IntermediateThrowEvent_1c9t58w</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>IntermediateThrowEvent_1jlnvjm</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>IntermediateThrowEvent_0rqamn8</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>IntermediateThrowEvent_0ue7kjs</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_05r7ocx</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>IntermediateThrowEvent_0pftlc9</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>IntermediateThrowEvent_0ue7kjs</bpmn:flowNodeRef>
       </bpmn:lane>
     </bpmn:laneSet>
     <bpmn:startEvent id="StartEvent_1" name="Dog">
@@ -50,9 +50,6 @@
     <bpmn:endEvent id="EndEvent_1m14ym9" name="Dog">
       <bpmn:incoming>SequenceFlow_1oknyaf</bpmn:incoming>
     </bpmn:endEvent>
-    <bpmn:task id="Task_05r7ocx" name="Cat">
-      <bpmn:multiInstanceLoopCharacteristics id="multiInstanceLoopCharacteristics_e7eaee71-16a7-482d-8b76-358c042429da" />
-    </bpmn:task>
     <bpmn:serviceTask id="Task_1pjpqz0" name="Cat">
       <bpmn:outgoing>SequenceFlow_1edsqdq</bpmn:outgoing>
       <bpmn:multiInstanceLoopCharacteristics id="multiInstanceLoopCharacteristics_1aedf36e-484a-4fe4-be23-9a49e9136ff4" />
@@ -67,7 +64,6 @@
       <bpmn:multiInstanceLoopCharacteristics id="multiInstanceLoopCharacteristics_8b556314-d108-44bc-8400-fa0a4b1652e5" />
     </bpmn:receiveTask>
     <bpmn:subProcess id="SubProcess_0th6hv3" name="cat">
-      <bpmn:multiInstanceLoopCharacteristics id="multiInstanceLoopCharacteristics_55df22ca-21a3-4b84-9c09-68e942bfee70" />
       <bpmn:startEvent id="StartEvent_1rxkj6g" name="poop">
         <bpmn:outgoing>SequenceFlow_15yu6zp</bpmn:outgoing>
       </bpmn:startEvent>
@@ -85,13 +81,6 @@
     <bpmn:boundaryEvent id="IntermediateThrowEvent_0rqamn8" name="happ" attachedToRef="Task_1pjpqz0">
       <bpmn:errorEventDefinition id="errorEventDefinition_d3c8ad8f-af99-4c1c-9580-0509546ec6af" />
     </bpmn:boundaryEvent>
-    <bpmn:boundaryEvent id="IntermediateThrowEvent_0ue7kjs" name="cat" attachedToRef="Task_05r7ocx">
-      <bpmn:messageEventDefinition id="messageEventDefinition_fe351169-64b2-41c8-8383-63f4eb6c9c19" />
-    </bpmn:boundaryEvent>
-    <bpmn:boundaryEvent id="IntermediateThrowEvent_0pftlc9" name="cat" attachedToRef="Task_05r7ocx">
-      <bpmn:outgoing>SequenceFlow_135m3sa</bpmn:outgoing>
-      <bpmn:timerEventDefinition id="timerEventDefinition_791cfbee-b3d4-4314-b23e-d9d9bc1cdf01" />
-    </bpmn:boundaryEvent>
     <bpmn:sequenceFlow id="SequenceFlow_135m3sa" name="fefe" sourceRef="IntermediateThrowEvent_0pftlc9" targetRef="ExclusiveGateway_0zw2nt1" />
     <bpmn:sequenceFlow id="SequenceFlow_1fetaup" sourceRef="Task_10ugd34" targetRef="Task_00znhpl" />
     <bpmn:sequenceFlow id="SequenceFlow_1edsqdq" sourceRef="Task_1pjpqz0" targetRef="Task_10ugd34" />
@@ -99,6 +88,16 @@
     <bpmn:sequenceFlow id="SequenceFlow_0bjdega" name="Dog" sourceRef="ExclusiveGateway_0zw2nt1" targetRef="EndEvent_1qai5bq" />
     <bpmn:sequenceFlow id="SequenceFlow_1uts8z1" name="DOg" sourceRef="ServiceTask_1luzsfd" targetRef="ExclusiveGateway_0zw2nt1" />
     <bpmn:sequenceFlow id="SequenceFlow_1hnbx9h" name="Dog" sourceRef="StartEvent_1" targetRef="ServiceTask_1luzsfd" />
+    <bpmn:task id="Task_05r7ocx" name="Cat">
+      <bpmn:multiInstanceLoopCharacteristics />
+    </bpmn:task>
+    <bpmn:boundaryEvent id="IntermediateThrowEvent_0pftlc9" name="cat" attachedToRef="Task_05r7ocx">
+      <bpmn:outgoing>SequenceFlow_135m3sa</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="timerEventDefinition_791cfbee-b3d4-4314-b23e-d9d9bc1cdf01" />
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="IntermediateThrowEvent_0ue7kjs" name="cat" attachedToRef="Task_05r7ocx">
+      <bpmn:messageEventDefinition id="messageEventDefinition_fe351169-64b2-41c8-8383-63f4eb6c9c19" messageRef="Message_1wmcbh6" />
+    </bpmn:boundaryEvent>
     <bpmn:textAnnotation id="TextAnnotation_1t2spfv">
       <bpmn:text>www</bpmn:text>
     </bpmn:textAnnotation>
@@ -147,6 +146,11 @@
   <bpmn:category id="Category_0u17ipj">
     <bpmn:categoryValue id="CategoryValue_1a52ttg" value="bb" />
   </bpmn:category>
+  <bpmn:message id="Message_1wmcbh6" name="wwww">
+    <bpmn:extensionElements>
+      <zeebe:subscription correlationKey="wwwww" />
+    </bpmn:extensionElements>
+  </bpmn:message>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
     <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_1xisnek">
       <bpmndi:BPMNShape id="StartEvent_1rxkj6g_di" bpmnElement="StartEvent_1rxkj6g">
@@ -191,9 +195,6 @@
         <bpmndi:BPMNLabel>
           <dc:Bounds x="680" y="675" width="21" height="14" />
         </bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_05r7ocx_di" bpmnElement="Task_05r7ocx">
-        <dc:Bounds x="580" y="270" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="ServiceTask_1hsh18n_di" bpmnElement="Task_1pjpqz0">
         <dc:Bounds x="730" y="370" width="100" height="80" />
@@ -370,6 +371,9 @@
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Participant_1estbij_di" bpmnElement="Participant_16w34k0" isHorizontal="true">
         <dc:Bounds x="375" y="80" width="600" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_04v973c_di" bpmnElement="Task_05r7ocx">
+        <dc:Bounds x="580" y="270" width="100" height="80" />
       </bpmndi:BPMNShape>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>

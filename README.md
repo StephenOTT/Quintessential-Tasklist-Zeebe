@@ -136,3 +136,34 @@ Formatting rules enable you to prevent common errors in formatting of BPMN.
 1. Add targeting based on BPMN Process Key
 1. Add special negating rule for Task Types and Correlation Keys
 1. Add Allowed Call Activity Process IDs: Rule to ensure only specific Process IDs can be called through the Modeler.
+
+
+## Workflow Sanitizer
+
+Workflow Sanitizer is the capability to remove aspects of a BPMN that are internal configuration that should not be shared when allowing users to download BPMN xml (such as when rendering a BPMN in the bpmn.js / bpmn.io modeler).
+
+Every element in a BPMN can be replaced with a sanitized version: a sanitized version is a new blank instance of the element that replaces the original element.
+Only configurations that are explicitly desired in a sanitized BPMN are transferred over into the new instance.
+
+The Sanitizer provides flexible usage options depending on your sanitizing needs:
+
+The core of Sanitizer provides a Workflow Linter that allows you to configure which types that inherit from `ModelElementInstance` will be targeted for cleaning.  
+The default Sanitizer Linter configuration targets all elements and applies a error code of `5000` ("it's Audi 5000"...).
+The default Sanitizer that actions each of the found elements, will take a lean approach:
+
+1. element Id values are kept.  This allows to continue targeting elements based on the IDs used in the BPMN's execution so you can do heatmaps, and BPMN status overlays (counts, what activities are currently failing, which ones have completed, loop counts, etc).
+1. All names are kept (these are usually the labels/names on each element/task/gateway/sequence-flow/pool, etc)
+1. All Annotations are kept.
+1. All markings and definition types are kept: but only the fact that they exist; their actual configuration is removed.
+1. Default Flow markings on sequence flows are kept.
+1. `Process` elements are not modified.  But their children would be modified as their are independent instances of `ModelElementInstance`
+
+What is explicitly not kept?
+
+1. Expressions
+1. Configurations on Events: message correlation keys, timer expressions, etc
+1. Receive Task Message Correlation configurations.
+1. Service Task Configurations: Headers, Type, Retries
+1. IO Mappings
+1. Loop Characteristic configurations (the "parallel" vs "sequential" marking is kept)
+1. Message Elements (even if a message is not tied to a element )
